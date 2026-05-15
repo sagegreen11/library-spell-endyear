@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Library Game MVP</title>
+<style>
+
+</style>
+</head>
+<body>
+
+
+<canvas id="c" width="500" height="400"></canvas>
+<div>
+  <button onclick="check()">Cast</button>
+  <button onclick="clear_()">Clear</button>
+</div>
+<div id="msg">HP: <span id="hp">100</span></div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let drawing = false;
+let points = [];
+let strokes = [];
+let hp = 100;
+
+function drawEnemy() {
+  ctx.fillStyle = 'red';
+  ctx.fillRect(180, 120, 140, 140);
+  ctx.fillStyle = 'black';
+  ctx.font = '14px sans-serif';
+  ctx.textAlign = 'center';
+}
+
+function redraw() {
+  ctx.clearRect(0, 0, 500, 400);
+  drawEnemy();
+  ctx.strokeStyle = 'blue';
+  ctx.lineWidth = 2;
+  strokes.forEach(s => {
+    ctx.beginPath();
+    s.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+  });
+  if (points.length > 1) {
+    ctx.beginPath();
+    points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+    ctx.stroke();
+  }
+}
+
+canvas.addEventListener('mousedown', e => {
+  const r = canvas.getBoundingClientRect();
+  drawing = true;
+  points = [{ x: e.clientX - r.left, y: e.clientY - r.top }];
+});
+canvas.addEventListener('mousemove', e => {
+  if (!drawing) return;
+  const r = canvas.getBoundingClientRect();
+  points.push({ x: e.clientX - r.left, y: e.clientY - r.top });
+  redraw();
+});
+canvas.addEventListener('mouseup', () => {
+  if (points.length > 1) strokes.push([...points]);
+  drawing = false; points = []; redraw();
+});
+
+function detectSquare(strokes) {
+  const all = strokes.flat();
+  if (all.length < 8) return false;
+  const xs = all.map(p => p.x), ys = all.map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const w = maxX - minX, h = maxY - minY;
+  if (w < 30 || h < 30) return false;
+  const ratio = Math.min(w, h) / Math.max(w, h);
+  if (ratio < 0.6) return false;
+  const margin = Math.max(w, h) * 0.25;
+  const onEdge = all.filter(p =>
+    p.x - minX < margin || maxX - p.x < margin ||
+    p.y - minY < margin || maxY - p.y < margin
+  ).length;
+  if (onEdge / all.length < 0.65) return false;
+  const first = all[0], last = all[all.length - 1];
+  return Math.hypot(last.x - first.x, last.y - first.y) < Math.max(w, h) * 0.4;
+}
+
+function check() {
+  if (strokes.length === 0) { document.getElementById('msg').textContent = 'Draw something first!'; return; }
+  if (detectSquare(strokes)) {
+    hp = Math.max(0, hp - 20);
+    document.getElementById('msg').innerHTML = `Hit! HP: <span id="hp">${hp}</span>`;
+    if (hp <= 0) document.getElementById('msg').textContent = 'Enemy defeated!';
+  } else {
+    document.getElementById('msg').innerHTML = `Missed! Draw a square. HP: <span id="hp">${hp}</span>`;
+  }
+  clear_();
+}
+
+function clear_() {
+  strokes = []; points = []; redraw();
+}
+
+redraw();
+</script>
+</body>
+</html>
