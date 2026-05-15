@@ -3,15 +3,62 @@
 <head>
 <meta charset="UTF-8">
 <title>Library Game MVP</title>
-<style>
 
+<style>
+  /*
+//things you could be working on
+// -math for the next few shapes (triangle, circle, pentagon, heart swirl)
+// moving enemy code 
+//color changing based on shapes
+//randomization of enemy shapes and hp
+// we have a lot of drawing to do too lots of it
+// dw about cut scenes and stuff but js focus on core gameplay
+LOVE YA - <Sage>
+*/
+  body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    margin: 0;
+    background: #f1f1f9;
+    font-family: sans-serif;
+    gap: 16px;
+  }
+  canvas {
+    border: 1px solid #444;
+    border-radius: 12px;
+    cursor: crosshair;
+    background: #f7f7f9;
+    touch-action: none;
+  }
+  .controls {
+    display: flex;
+    gap: 12px;
+  }
+  button {
+    padding: 8px 28px;
+    font-size: 15px;
+    border: 1px solid #555;
+    border-radius: 8px;
+    background: transparent;
+    color: #f9b6d4;
+    cursor: pointer;
+  }
+  button:hover { background: rgba(252, 238, 238, 0.1); }
+  #msg {
+    font-size: 16px;
+    font-weight: 500;
+    color: #eee;
+    min-height: 24px;
+  }
 </style>
 </head>
 <body>
 
-
-<canvas id="c" width="500" height="400"></canvas>
-<div>
+<canvas id="c" width="620" height="460"></canvas>
+<div class="controls">
   <button onclick="check()">Cast</button>
   <button onclick="clear_()">Clear</button>
 </div>
@@ -25,19 +72,50 @@ let points = [];
 let strokes = [];
 let hp = 100;
 
+//the function that straght up changes the color for the square
+//probably gonna make a lot more of these for different shapes+colors but for now js squre
+function getColor() {
+  const all = strokes.flat().concat(points);
+  if (all.length < 8) return '#4A90D9';
+  if (looksLikeSquare(all)) return '#3BBA4C';
+  return '#4A90D9';
+}
+
 function drawEnemy() {
-  ctx.fillStyle = 'red';
-  ctx.fillRect(180, 120, 140, 140);
-  ctx.fillStyle = 'black';
-  ctx.font = '14px sans-serif';
+  const ex = 210, ey = 140, ew = 200, eh = 160;
+
+  // HP bar code
+  // just used some mathto channge the color of the bar so yeah
+  const barW = 200, barH = 16;
+  const bx = ex, by = ey - 30;
+  ctx.fillStyle = '#555';
+  ctx.beginPath();
+  ctx.roundRect(bx, by, barW, barH, 6);
+  ctx.fill();
+  ctx.fillStyle = hp > 50 ? '#27AE60' : hp > 25 ? '#E67E22' : '#C0392B';
+  ctx.beginPath();
+  ctx.roundRect(bx, by, barW * (hp / 100), barH, 6);
+  ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = '11px sans-serif';
   ctx.textAlign = 'center';
+  ctx.fillText(`${hp}/100`, bx + barW / 2, by + 12);
+
+  // Plain square
+  ctx.fillStyle = '#C0392B';
+  ctx.beginPath();
+  ctx.roundRect(ex, ey, ew, eh, 12);
+  ctx.fill();
 }
 
 function redraw() {
-  ctx.clearRect(0, 0, 500, 400);
+  ctx.clearRect(0, 0, 620, 460);
   drawEnemy();
-  ctx.strokeStyle = 'blue';
-  ctx.lineWidth = 2;
+  const color = getColor();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 4;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
   strokes.forEach(s => {
     ctx.beginPath();
     s.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
@@ -50,24 +128,23 @@ function redraw() {
   }
 }
 
-canvas.addEventListener('mousedown', e => {
+function getPos(e) {
   const r = canvas.getBoundingClientRect();
-  drawing = true;
-  points = [{ x: e.clientX - r.left, y: e.clientY - r.top }];
-});
-canvas.addEventListener('mousemove', e => {
-  if (!drawing) return;
-  const r = canvas.getBoundingClientRect();
-  points.push({ x: e.clientX - r.left, y: e.clientY - r.top });
-  redraw();
-});
-canvas.addEventListener('mouseup', () => {
-  if (points.length > 1) strokes.push([...points]);
-  drawing = false; points = []; redraw();
-});
+  if (e.touches) return { x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top };
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
 
-function detectSquare(strokes) {
-  const all = strokes.flat();
+canvas.addEventListener('mousedown', e => { drawing = true; points = [getPos(e)]; });
+canvas.addEventListener('mousemove', e => { if (!drawing) return; points.push(getPos(e)); redraw(); });
+canvas.addEventListener('mouseup', () => { if (points.length > 1) strokes.push([...points]); drawing = false; points = []; redraw(); });
+canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; points = [getPos(e)]; });
+canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; points.push(getPos(e)); redraw(); });
+canvas.addEventListener('touchend', e => { e.preventDefault(); if (points.length > 1) strokes.push([...points]); drawing = false; points = []; redraw(); });
+
+// this is the math part for calculating if something is a square guys -- this checks if the shape looks like a square, then chnges the color green.
+//its basically checking the points of strokes and where they fit 
+// this math is very difficult to code so, for shapes just get it from CHATGPT
+function looksLikeSquare(all) {
   if (all.length < 8) return false;
   const xs = all.map(p => p.x), ys = all.map(p => p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
@@ -86,12 +163,20 @@ function detectSquare(strokes) {
   return Math.hypot(last.x - first.x, last.y - first.y) < Math.max(w, h) * 0.4;
 }
 
+//calling the detectSquare function calls the looks square function so yeah
+function detectSquare(strokes) {
+  return looksLikeSquare(strokes.flat());
+}
+
 function check() {
   if (strokes.length === 0) { document.getElementById('msg').textContent = 'Draw something first!'; return; }
   if (detectSquare(strokes)) {
     hp = Math.max(0, hp - 20);
-    document.getElementById('msg').innerHTML = `Hit! HP: <span id="hp">${hp}</span>`;
-    if (hp <= 0) document.getElementById('msg').textContent = 'Enemy defeated!';
+    if (hp <= 0) {
+      document.getElementById('msg').textContent = 'Enemy defeated!';
+    } else {
+      document.getElementById('msg').innerHTML = `Hit! HP: <span id="hp">${hp}</span>`;
+    }
   } else {
     document.getElementById('msg').innerHTML = `Missed! Draw a square. HP: <span id="hp">${hp}</span>`;
   }
