@@ -168,6 +168,15 @@ function looksLikeSquare(all) {
   return Math.hypot(last.x - first.x, last.y - first.y) < Math.max(w, h) * 0.4;
 }
 
+function looksLikeTriangle(all) {
+  // Placeholder for triangle detection logic
+  return false;
+}
+
+function looksLikeCircle(all) {
+  // Placeholder for circle detection logic
+  return false;
+}
 //calling the detectSquare function calls the looks square function so yeah
 function detectSquare(strokes) {
   return looksLikeSquare(strokes.flat());
