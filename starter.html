@@ -11,33 +11,40 @@
     justify-content: center;
     min-height: 100vh;
     margin: 0;
-    background: #f1f1f9;
+    background: #6f4e3f;
     font-family: sans-serif;
     gap: 16px;
   }
   canvas {
-    border: 1px solid #444;
+    border: 1px solid #ffffff;
     border-radius: 16px;
     cursor: crosshair;
-    background: #f7f7f9;
+    background: url("background.png") center/cover;
     touch-action: none;
+  }
+  starting-words {
+    font-size: 18px;
+    color: #fff;
+    text-shadow: 0 0 4px rgba(0,0,0,0.5);
+
   }
   .controls { display: flex; gap: 12px; }
   button {
     padding: 8px 28px;
     font-size: 15px;
+    font-color: #ffffff;
     border: 1px solid #555;
     border-radius: 8px;
     background: transparent;
     cursor: pointer;
   }
-  button:hover { background: rgba(0,0,0,0.05); }
+  button:hover { background: rgba(255,255,255,0.05); }
   #hud { font-size: 15px; min-height: 24px; }
 </style>
 </head>
 <body>
 
-<canvas id="c" width="620" height="500"></canvas>
+<canvas id="c" width="860" height="660"></canvas>
 <div class="controls">
   <button onclick="castSpell()">Cast</button>
   <button onclick="clearDrawing()">Clear</button>
@@ -47,13 +54,21 @@
 <script>
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
-const W = 620, H = 500;
+
+const bg = new Image();
+bg.src = "background.png"; 
+const W = 860, H = 660;
 const CX = W / 2, CY = H / 2;
+
+
+//uh we need some sort of like standard character
+//and weneed to draw like the evil book
 
 let drawing = false;
 let points = [];
 let strokes = [];
 let playerHP = 100;
+let bossFight = false;
 let gameOver = false;
 let enemies = [];
 let spawnTimer = 0;
@@ -140,6 +155,18 @@ function drawPlayerHPBar() {
   ctx.fillText(`Player HP: ${playerHP}/100`, bx + bw/2, by + 8);
 }
 
+function drawBossFight() {
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 28px serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Boss Fight!', W/2, H/2 - 20);
+  ctx.font = '18px serif';
+  ctx.fillText('Defeat the boss by drawing the correct shape!', W/2, H/2 + 20);
+}
+
 function drawHUD() {
   const e = enemies.find(e => !e.dead);
   if (e && !gameOver) {
@@ -189,6 +216,9 @@ function drawUserStrokes() {
 
 function loop() {
   ctx.clearRect(0, 0, W, H);
+  // okay add a timer or some sort of quantifier for the end of this episode because its to long and we haveto go to the net level
+  //maybe we should dop three level of difficulty and a miniboss fight 
+
 
   if (!gameOver) {
     spawnTimer++;
