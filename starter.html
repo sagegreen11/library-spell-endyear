@@ -22,17 +22,10 @@
     background: url("background.png") center/cover;
     touch-action: none;
   }
-  starting-words {
-    font-size: 18px;
-    color: #fff;
-    text-shadow: 0 0 4px rgba(0,0,0,0.5);
-
-  }
   .controls { display: flex; gap: 12px; }
   button {
     padding: 8px 28px;
     font-size: 15px;
-    font-color: #ffffff;
     border: 1px solid #555;
     border-radius: 8px;
     background: transparent;
@@ -55,28 +48,26 @@
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 
-const bg = new Image();
-bg.src = "background.png"; 
 const W = 860, H = 660;
 const CX = W / 2, CY = H / 2;
-
-
-//uh we need some sort of like standard character
-//and weneed to draw like the evil book
 
 let drawing = false;
 let points = [];
 let strokes = [];
 let playerHP = 100;
-let bossFight = false;
 let gameOver = false;
 let enemies = [];
 let spawnTimer = 0;
 let spawnInterval = 180;
 let wave = 0;
 
-const SHAPES = ['circle', 'square', 'line'];
-const SHAPE_COLORS = { circle: '#4A90D9', square: '#C0392B', line: '#9B59B6' };
+const SHAPES = ['circle', 'square', 'line', 'triangle'];
+const SHAPE_COLORS = {
+  circle: '#4A90D9',
+  square: '#C0392B',
+  line: '#9B59B6',
+  triangle: '#E67E22'
+};
 
 function spawnEnemy() {
   const angle = Math.random() * Math.PI * 2;
@@ -107,9 +98,16 @@ function drawEnemyShape(e) {
     ctx.beginPath();
     ctx.arc(0, 0, s/2, 0, Math.PI*2);
     ctx.fill(); ctx.stroke();
-  } else {
+  } else if (shape === 'line') {
     ctx.beginPath();
     ctx.roundRect(-s/2, -s*0.28, s, s*0.56, 5);
+    ctx.fill(); ctx.stroke();
+  } else if (shape === 'triangle') {
+    ctx.beginPath();
+    ctx.moveTo(0, -s/2);
+    ctx.lineTo(s/2, s/2);
+    ctx.lineTo(-s/2, s/2);
+    ctx.closePath();
     ctx.fill(); ctx.stroke();
   }
 
@@ -117,8 +115,8 @@ function drawEnemyShape(e) {
   ctx.font = `bold ${Math.round(s * 0.32)}px sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const label = shape === 'square' ? '□' : shape === 'circle' ? '○' : '—';
-  ctx.fillText(label, 0, 0);
+  const label = { square: '□', circle: '○', line: '—', triangle: '△' }[shape];
+  ctx.fillText(label, 0, shape === 'triangle' ? s * 0.1 : 0);
   ctx.restore();
 }
 
@@ -155,29 +153,20 @@ function drawPlayerHPBar() {
   ctx.fillText(`Player HP: ${playerHP}/100`, bx + bw/2, by + 8);
 }
 
-function drawBossFight() {
-  ctx.fillStyle = 'rgba(0,0,0,0.7)';
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 28px serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('Boss Fight!', W/2, H/2 - 20);
-  ctx.font = '18px serif';
-  ctx.fillText('Defeat the boss by drawing the correct shape!', W/2, H/2 + 20);
-}
-
 function drawHUD() {
   const e = enemies.find(e => !e.dead);
   if (e && !gameOver) {
-    const label = e.shape === 'square' ? 'Draw a SQUARE'
-      : e.shape === 'circle' ? 'Draw a CIRCLE'
-      : 'Draw a HORIZONTAL LINE';
+    const labels = {
+      square: 'Draw a SQUARE',
+      circle: 'Draw a CIRCLE',
+      line: 'Draw a HORIZONTAL LINE',
+      triangle: 'Draw a TRIANGLE'
+    };
     ctx.fillStyle = SHAPE_COLORS[e.shape];
     ctx.font = 'bold 14px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText(label, W/2, 10);
+    ctx.fillText(labels[e.shape], W/2, 10);
   }
   if (gameOver) {
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
@@ -196,7 +185,7 @@ function drawUserStrokes() {
   const all = strokes.flat().concat(points);
   let color = '#4A90D9';
   if (all.length >= 8) {
-    if (looksLikeSquare(all) || looksLikeCircle(all) || looksLikeLine(all)) color = '#3BBA4C';
+    if (looksLikeSquare(all) || looksLikeCircle(all) || looksLikeLine(all) || looksLikeTriangle(all)) color = '#3BBA4C';
   }
   ctx.strokeStyle = color;
   ctx.lineWidth = 3.5;
@@ -216,9 +205,6 @@ function drawUserStrokes() {
 
 function loop() {
   ctx.clearRect(0, 0, W, H);
-  // okay add a timer or some sort of quantifier for the end of this episode because its to long and we haveto go to the net level
-  //maybe we should dop three level of difficulty and a miniboss fight 
-
 
   if (!gameOver) {
     spawnTimer++;
@@ -273,7 +259,6 @@ canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; p
 canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; points.push(getPos(e)); });
 canvas.addEventListener('touchend', e => { e.preventDefault(); if (points.length>1) strokes.push([...points]); drawing=false; points=[]; });
 
-// Shape detection
 function looksLikeSquare(all) {
   if (all.length < 8) return false;
   const xs=all.map(p=>p.x), ys=all.map(p=>p.y);
@@ -314,6 +299,28 @@ function looksLikeLine(all) {
   return h/w < 0.35;
 }
 
+function looksLikeTriangle(all) {
+  if (all.length < 15) return false;
+  const xs = all.map(p => p.x);
+  const ys = all.map(p => p.y);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const w = maxX - minX, h = maxY - minY;
+  if (w < 40 || h < 40) return false;
+  const first = all[0], last = all[all.length - 1];
+  if (Math.hypot(last.x - first.x, last.y - first.y) > 50) return false;
+  let corners = 0;
+  for (let i = 2; i < all.length; i++) {
+    const p0 = all[i-2], p1 = all[i-1], p2 = all[i];
+    const a1 = Math.atan2(p1.y-p0.y, p1.x-p0.x);
+    const a2 = Math.atan2(p2.y-p1.y, p2.x-p1.x);
+    let diff = Math.abs(a2 - a1);
+    if (diff > Math.PI) diff = 2*Math.PI - diff;
+    if (diff > 0.8) corners++;
+  }
+  return corners >= 2 && corners <= 8;
+}
+
 function castSpell() {
   if (gameOver) return;
   if (strokes.length === 0) { document.getElementById('hud').textContent = 'Draw a shape first!'; return; }
@@ -321,12 +328,13 @@ function castSpell() {
   const sq = looksLikeSquare(all);
   const ci = looksLikeCircle(all);
   const li = looksLikeLine(all);
+  const tr = looksLikeTriangle(all);
 
   let hit = false;
   for (let i = 0; i < enemies.length; i++) {
     const e = enemies[i];
     if (e.dead) continue;
-    if ((e.shape==='square'&&sq)||(e.shape==='circle'&&ci)||(e.shape==='line'&&li)) {
+    if ((e.shape==='square'&&sq)||(e.shape==='circle'&&ci)||(e.shape==='line'&&li)||(e.shape==='triangle'&&tr)) {
       e.dead = true;
       e.deadTimer = 20;
       document.getElementById('hud').textContent = 'Enemy defeated!';
@@ -336,11 +344,16 @@ function castSpell() {
   }
 
   if (!hit) {
-    const needed = enemies.find(e=>!e.dead);
-    const label = needed
-      ? (needed.shape==='square'?'Draw a SQUARE':needed.shape==='circle'?'Draw a CIRCLE':'Draw a HORIZONTAL LINE')
+    const needed = enemies.find(e => !e.dead);
+    const labels = {
+      square: 'Draw a SQUARE',
+      circle: 'Draw a CIRCLE',
+      line: 'Draw a HORIZONTAL LINE',
+      triangle: 'Draw a TRIANGLE'
+    };
+    document.getElementById('hud').textContent = needed
+      ? `Wrong shape! ${labels[needed.shape]}`
       : 'No enemies!';
-    document.getElementById('hud').textContent = `Wrong shape! ${label}`;
   }
 
   clearDrawing();
