@@ -44,6 +44,7 @@
 </div>
 <div id="hud">Draw the required shape to defeat each enemy!</div>
 
+
 <script>
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
@@ -60,6 +61,13 @@ let enemies = [];
 let spawnTimer = 0;
 let spawnInterval = 300;
 let wave = 0;
+let level = 1;
+let showingLevel1 = true;
+let showingLevel2 = false;
+let levelScreenTimer = 0;
+let level2Started = false;
+let enemyKillCount = 0;
+const LEVEL_SCREEN_DURATION = 180;
 
 const SHAPES = ['circle', 'square', 'line', 'triangle'];
 const SHAPE_COLORS = {
@@ -116,7 +124,6 @@ function spawnEnemy() {
   }
 }
 
-// Draw small shape icons for the combo sequence above the enemy
 function drawComboIndicator(e) {
   if (!e.isCombo) return;
   const iconSize = 13;
@@ -131,7 +138,6 @@ function drawComboIndicator(e) {
     ctx.save();
     ctx.globalAlpha = e.dead ? Math.max(0, e.deadTimer / 20) : 1;
 
-    // Done shapes: faded with checkmark tint; current: bright; upcoming: dim
     if (idx < e.comboIndex) {
       ctx.globalAlpha *= 0.35;
     } else if (idx === e.comboIndex) {
@@ -259,33 +265,67 @@ function drawPlayerHPBar() {
 }
 
 function drawHUD() {
+  // Score + Goal
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 15px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+
+  const goal = enemyKillCount < 5 ? 5 : 10;
+
+  ctx.fillText(`Level: ${level}`, 12, 10);
+  ctx.fillText(`Score: ${enemyKillCount}/${goal}`, 12, 30);
+
   const e = enemies.find(e => !e.dead);
+
   if (e && !gameOver) {
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+
     if (e.isCombo) {
       const remaining = e.combo.slice(e.comboIndex);
       const text = 'Draw: ' + remaining.map(s => SHAPE_LABELS[s]).join(' + ');
+
       ctx.fillStyle = '#FFD700';
       ctx.font = 'bold 14px sans-serif';
-      ctx.fillText('⚡ COMBO ENEMY — ' + text, W/2, 10);
+      ctx.fillText('COMBO ENEMY — ' + text, W / 2, 10);
     } else {
       ctx.fillStyle = SHAPE_COLORS[e.shape];
       ctx.font = 'bold 14px sans-serif';
-      ctx.fillText('Draw a ' + SHAPE_LABELS[e.shape], W/2, 10);
+      ctx.fillText('Draw a ' + SHAPE_LABELS[e.shape], W / 2, 10);
     }
   }
+
   if (gameOver) {
     ctx.fillStyle = 'rgba(0,0,0,0.55)';
     ctx.fillRect(0, 0, W, H);
+
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 32px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+
     ctx.fillText('Game Over', W/2, H/2 - 20);
+
     ctx.font = '18px sans-serif';
     ctx.fillText('Refresh to play again', W/2, H/2 + 20);
   }
+}
+
+function drawLevelScreen(title, subtitle) {
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.fillStyle = '#fff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  ctx.font = 'bold 38px sans-serif';
+  ctx.fillText(title, W / 2, H / 2 - 30);
+
+  ctx.font = '20px sans-serif';
+  ctx.fillText(subtitle, W / 2, H / 2 + 15);
+
+  ctx.font = '16px sans-serif';
 }
 
 function drawUserStrokes() {
@@ -313,6 +353,46 @@ function drawUserStrokes() {
 function loop() {
   ctx.clearRect(0, 0, W, H);
 
+  // Draw world first
+  enemies.forEach(drawEnemyShape);
+  drawPlayer();
+  drawPlayerHPBar();
+  drawUserStrokes();
+  drawHUD();
+
+  if (showingLevel1) {
+  drawLevelScreen(
+    'Level 1',
+    'Defeat 5 enemies'
+  );
+
+  levelScreenTimer++;
+
+  if (levelScreenTimer >= LEVEL_SCREEN_DURATION) {
+    showingLevel1 = false;
+  }
+
+  requestAnimationFrame(loop);
+  return;
+}
+
+  if (showingLevel2) {
+  drawLevelScreen(
+    'Level 2',
+    'Defeat 10 enemies'
+  );
+
+  levelScreenTimer++;
+
+  if (levelScreenTimer >= LEVEL_SCREEN_DURATION) {
+    showingLevel2 = false;
+  }
+
+  requestAnimationFrame(loop);
+  return;
+}
+  ctx.clearRect(0, 0, W, H);
+
   if (!gameOver) {
     spawnTimer++;
     if (spawnTimer >= spawnInterval) {
@@ -320,6 +400,15 @@ function loop() {
       wave++;
       spawnEnemy();
       if (spawnInterval > 140) spawnInterval -= 5;
+    }
+
+    if (enemyKillCount >= 5 && !level2Started) {
+      level = 2;
+      goal = 10;
+      enemyKillCount = 0;
+      level2Started = true;
+      showingLevel2 = true;
+      levelScreenTimer = 0;
     }
 
     enemies.forEach(e => {
@@ -438,7 +527,7 @@ function looksLikeTriangle(all) {
 function detectShape(all) {
   if (looksLikeLine(all)) return 'line';
   if (looksLikeTriangle(all)) return 'triangle';
-    if (looksLikeSquare(all)) return 'square';
+  if (looksLikeSquare(all)) return 'square';
   if (looksLikeCircle(all)) return 'circle';
   return null;
 }
@@ -461,6 +550,7 @@ function castSpell() {
       target.dead = true;
       target.deadTimer = 20;
       document.getElementById('hud').textContent = 'Enemy defeated!';
+      enemyKillCount++;
     } else {
       document.getElementById('hud').textContent = `Wrong shape! Draw a ${SHAPE_LABELS[target.shape]}`;
     }
@@ -489,7 +579,7 @@ function castSpell() {
     if (allMatch) {
       target.dead = true;
       target.deadTimer = 20;
-      document.getElementById('hud').textContent = '⚡ COMBO DEFEATED!';
+      document.getElementById('hud').textContent = 'COMBO DEFEATED!';
     }
   }
 
