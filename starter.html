@@ -1,39 +1,40 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Library Game</title>
-<style>
-  body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    margin: 0;
-    background: #6f4e3f;
-    font-family: sans-serif;
-    gap: 16px;
-  }
-  canvas {
-    border: 1px solid #ffffff;
-    border-radius: 16px;
-    cursor: crosshair;
-    background: url("background.png") center/cover;
-    touch-action: none;
-  }
-  .controls { display: flex; gap: 12px; }
-  button {
-    padding: 8px 28px;
-    font-size: 15px;
-    border: 1px solid #555;
-    border-radius: 8px;
-    background: transparent;
-    cursor: pointer;
-  }
-  button:hover { background: rgba(255,255,255,0.05); }
-  #hud { font-size: 15px; min-height: 24px; }
-</style>
+  <meta charset="UTF-8">
+  <title>Library Game</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #6f4e3f;
+      font-family: sans-serif;
+      gap: 16px;
+    }
+    canvas {
+      border: 1px solid #ffffff;
+      border-radius: 16px;
+      cursor: crosshair;
+      background: url("background.png") center/cover;
+      touch-action: none;
+    }
+    .controls { display: flex; gap: 12px; }
+    button {
+      padding: 8px 28px;
+      font-size: 15px;
+      border: 1px solid #555;
+      border-radius: 8px;
+      background: transparent;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover { background: rgba(255,255,255,0.1); }
+    #hud { font-size: 15px; min-height: 24px; color: #fff; text-shadow: 0 0 4px rgba(0,0,0,0.5); }
+  </style>
 </head>
 <body>
 
@@ -45,325 +46,685 @@
 <div id="hud">Draw the required shape to defeat each enemy!</div>
 
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
 
-const W = 860, H = 660;
-const CX = W / 2, CY = H / 2;
+  const W = 860, H = 660;
+  const CX = W / 2, CY = H / 2;
 
-let drawing = false;
-let points = [];
-let strokes = [];
-let playerHP = 100;
-let gameOver = false;
-let enemies = [];
-let spawnTimer = 0;
-let spawnInterval = 180;
-let wave = 0;
+  let drawing = false;
+  let points = [];
+  let strokes = [];
+  let playerHP = 100;
+  let gameOver = false;
+  let enemies = [];
+  let spawnTimer = 0;
+  let spawnInterval = 250;
+  let wave = 0;
 
-const SHAPES = ['circle', 'square', 'line', 'triangle'];
-const SHAPE_COLORS = {
-  circle: '#4A90D9',
-  square: '#C0392B',
-  line: '#9B59B6',
-  triangle: '#E67E22'
-};
+  let powerups = [];
+  let powerupTimer = 0;
+  let powerupInterval = 600;
+  let slowActive = 0;
+  let shieldActive = false;
 
-function spawnEnemy() {
-  const angle = Math.random() * Math.PI * 2;
-  const r = 320;
-  const x = CX + Math.cos(angle) * r;
-  const y = CY + Math.sin(angle) * r;
-  const shape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
-  const speed = 0.35 + Math.random() * 0.2 + wave * 0.05;
-  enemies.push({ x, y, shape, speed, size: 34, hit: 0, dead: false, deadTimer: 0 });
-}
+  const POWERUPS = {
+    slow:      { color: '#00CFFF', icon: '🐢', shape: 'lightning' },
+    shield:    { color: '#FFD700', icon: '🛡️',  shape: 'heart'     },
+    multicast: { color: '#FF69B4', icon: '💥', shape: 'star'      }
+  };
+  const POWERUP_TYPES  = Object.keys(POWERUPS);
+  const POWERUP_COLORS = { slow: '#00CFFF', shield: '#FFD700', multicast: '#FF69B4' };
+  const POWERUP_ICONS  = { slow: '🐢', shield: '🛡️', multicast: '💥' };
 
-function drawEnemyShape(e) {
-  const { x, y, size, shape, hit } = e;
-  const pulse = hit > 0 ? 1 + Math.sin(hit * 0.4) * 0.18 : 1;
-  const s = size * pulse;
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.globalAlpha = e.dead ? Math.max(0, e.deadTimer / 20) : 1;
-  ctx.fillStyle = SHAPE_COLORS[shape];
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2;
+  const SHAPES = ['circle', 'square', 'line', 'triangle'];
+  const SHAPE_COLORS = {
+    circle:   '#4A90D9',
+    square:   '#C0392B',
+    line:     '#9B59B6',
+    triangle: '#E67E22'
+  };
+  const SHAPE_LABELS = {
+    square:   'SQUARE',
+    circle:   'CIRCLE',
+    line:     'LINE',
+    triangle: 'TRIANGLE'
+  };
 
-  if (shape === 'square') {
-    ctx.beginPath();
-    ctx.roundRect(-s/2, -s/2, s, s, 5);
-    ctx.fill(); ctx.stroke();
-  } else if (shape === 'circle') {
-    ctx.beginPath();
-    ctx.arc(0, 0, s/2, 0, Math.PI*2);
-    ctx.fill(); ctx.stroke();
-  } else if (shape === 'line') {
-    ctx.beginPath();
-    ctx.roundRect(-s/2, -s*0.28, s, s*0.56, 5);
-    ctx.fill(); ctx.stroke();
-  } else if (shape === 'triangle') {
-    ctx.beginPath();
-    ctx.moveTo(0, -s/2);
-    ctx.lineTo(s/2, s/2);
-    ctx.lineTo(-s/2, s/2);
-    ctx.closePath();
-    ctx.fill(); ctx.stroke();
+  function randomShape() {
+    return SHAPES[Math.floor(Math.random() * SHAPES.length)];
   }
 
-  ctx.fillStyle = '#fff';
-  ctx.font = `bold ${Math.round(s * 0.32)}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const label = { square: '□', circle: '○', line: '—', triangle: '△' }[shape];
-  ctx.fillText(label, 0, shape === 'triangle' ? s * 0.1 : 0);
-  ctx.restore();
-}
-
-function drawPlayer() {
-  ctx.save();
-  ctx.translate(CX, CY);
-  ctx.fillStyle = '#4A90D9';
-  ctx.beginPath();
-  ctx.arc(0, 0, 22, 0, Math.PI*2);
-  ctx.fill();
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 18px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('✦', 0, 1);
-  ctx.restore();
-}
-
-function drawPlayerHPBar() {
-  const bw = 200, bh = 16;
-  const bx = (W - bw) / 2, by = H - 36;
-  ctx.fillStyle = 'rgba(80,80,80,0.4)';
-  ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 6); ctx.fill();
-  const pct = playerHP / 100;
-  ctx.fillStyle = playerHP > 50 ? '#27AE60' : playerHP > 25 ? '#E67E22' : '#C0392B';
-  ctx.beginPath(); ctx.roundRect(bx, by, bw * pct, bh, 6); ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = '11px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`Player HP: ${playerHP}/100`, bx + bw/2, by + 8);
-}
-
-function drawHUD() {
-  const e = enemies.find(e => !e.dead);
-  if (e && !gameOver) {
-    const labels = {
-      square: 'Draw a SQUARE',
-      circle: 'Draw a CIRCLE',
-      line: 'Draw a HORIZONTAL LINE',
-      triangle: 'Draw a TRIANGLE'
-    };
-    ctx.fillStyle = SHAPE_COLORS[e.shape];
-    ctx.font = 'bold 14px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(labels[e.shape], W/2, 10);
+  function makeCombo() {
+    const len = Math.random() < 0.5 ? 2 : 3;
+    const combo = [];
+    for (let i = 0; i < len; i++) combo.push(randomShape());
+    return combo;
   }
-  if (gameOver) {
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 32px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Game Over', W/2, H/2 - 20);
-    ctx.font = '18px sans-serif';
-    ctx.fillText('Refresh to play again', W/2, H/2 + 20);
-  }
-}
 
-function drawUserStrokes() {
-  const all = strokes.flat().concat(points);
-  let color = '#4A90D9';
-  if (all.length >= 8) {
-    if (looksLikeSquare(all) || looksLikeCircle(all) || looksLikeLine(all) || looksLikeTriangle(all)) color = '#3BBA4C';
-  }
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3.5;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  strokes.forEach(s => {
-    ctx.beginPath();
-    s.forEach((p, i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
-    ctx.stroke();
-  });
-  if (points.length > 1) {
-    ctx.beginPath();
-    points.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
-    ctx.stroke();
-  }
-}
+  function spawnEnemy() {
+    const angle = Math.random() * Math.PI * 2;
+    const r = 320;
+    const x = CX + Math.cos(angle) * r;
+    const y = CY + Math.sin(angle) * r;
+    const speed = 0.4 + Math.random() * 0.2 + wave * 0.03;
+    const isCombo = wave > 2 && Math.random() < 0.3;
 
-function loop() {
-  ctx.clearRect(0, 0, W, H);
+    if (isCombo) {
+      const combo = makeCombo();
+      enemies.push({
+        x, y, speed, size: 38,
+        hit: 0, dead: false, deadTimer: 0,
+        isCombo: true,
+        combo, comboIndex: 0,
+        shape: combo[0]
+      });
+    } else {
+      const shape = randomShape();
+      enemies.push({
+        x, y, shape, speed, size: 34,
+        hit: 0, dead: false, deadTimer: 0,
+        isCombo: false
+      });
+    }
+  }
 
-  if (!gameOver) {
-    spawnTimer++;
-    if (spawnTimer >= spawnInterval) {
-      spawnTimer = 0;
-      wave++;
-      spawnEnemy();
-      if (spawnInterval > 80) spawnInterval -= 8;
+  function spawnPowerup() {
+    const type = POWERUP_TYPES[Math.floor(Math.random() * POWERUP_TYPES.length)];
+    const angle = Math.random() * Math.PI * 2;
+    const r = 120 + Math.random() * 140;
+    powerups.push({
+      x: CX + Math.cos(angle) * r,
+      y: CY + Math.sin(angle) * r,
+      type,
+      requiredShape: POWERUPS[type].shape,
+      size: 22,
+      bobOffset: Math.random() * Math.PI * 2,
+      collected: false
+    });
+  }
+
+  /* ─── SHAPE DETECTION ──────────────────────────────────────────────────── */
+
+  function looksLikeLine(all) {
+    if (all.length < 6) return false;
+    const xs = all.map(p => p.x), ys = all.map(p => p.y);
+    const w = Math.max(...xs) - Math.min(...xs);
+    const h = Math.max(...ys) - Math.min(...ys);
+    if (w < 60) return false;
+    return h / w < 0.35;
+  }
+
+  // Circle: must be roughly round AND points stay near constant radius from center.
+  // More lenient threshold (0.32) and looser aspect ratio (0.45).
+  function looksLikeCircle(all) {
+    if (all.length < 10) return false;
+    const xs = all.map(p => p.x), ys = all.map(p => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const w = maxX - minX, h = maxY - minY;
+    if (w < 30 || h < 30) return false;
+
+    const ratio = Math.min(w, h) / Math.max(w, h);
+    if (ratio < 0.45) return false;  // relaxed from 0.6
+
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
+    const avgD  = dists.reduce((a, b) => a + b, 0) / dists.length;
+    const variance = dists.reduce((a, b) => a + Math.abs(b - avgD), 0) / dists.length;
+
+    return variance / avgD < 0.32;  // relaxed from 0.2
+  }
+
+  // Square: bounded box with ~equal width/height, variance between circle and triangle.
+  function looksLikeSquare(all) {
+    if (all.length < 10) return false;
+    const xs = all.map(p => p.x), ys = all.map(p => p.y);
+    const w = Math.max(...xs) - Math.min(...xs);
+    const h = Math.max(...ys) - Math.min(...ys);
+    const ratio = Math.min(w, h) / Math.max(w, h);
+    if (w < 20 || h < 20 || ratio < 0.5) return false;
+
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
+    const avgD = dists.reduce((a, b) => a + b, 0) / dists.length;
+    const variance = dists.reduce((a, b) => a + Math.abs(b - avgD), 0) / dists.length;
+    const vr = variance / avgD;
+
+    // Squares: variance higher than circle but lower than triangle
+    return vr >= 0.10 && vr <= 0.32;
+  }
+
+  // Triangle: high variance (pointy corners pull far from center)
+  function looksLikeTriangle(all) {
+    if (all.length < 10) return false;
+    const xs = all.map(p => p.x), ys = all.map(p => p.y);
+    const w = Math.max(...xs) - Math.min(...xs);
+    const h = Math.max(...ys) - Math.min(...ys);
+    if (w < 20 || h < 20) return false;
+
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
+    const avgD = dists.reduce((a, b) => a + b, 0) / dists.length;
+    const variance = dists.reduce((a, b) => a + Math.abs(b - avgD), 0) / dists.length;
+
+    return variance / avgD > 0.28;
+  }
+
+  // Heart: wide shape where center-top dips lower than left/right top edges.
+  // Split the stroke into left half and right half; each should have a bump at top.
+  function looksLikeHeart(all) {
+    if (all.length < 16) return false;
+    const xs = all.map(p => p.x), ys = all.map(p => p.y);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const w = maxX - minX, h = maxY - minY;
+    if (w < 40 || h < 40) return false;
+
+    const ratio = Math.min(w, h) / Math.max(w, h);
+    if (ratio < 0.4) return false;  // hearts are roughly as wide as tall
+
+    // Bottom of a heart should be a point: check that bottom 20% of points cluster in a narrow band
+    const bottomThresh = maxY - h * 0.20;
+    const bottomPoints = all.filter(p => p.y > bottomThresh);
+    if (bottomPoints.length < 2) return false;
+    const bxs = bottomPoints.map(p => p.x);
+    const bottomSpread = Math.max(...bxs) - Math.min(...bxs);
+    if (bottomSpread > w * 0.45) return false;  // bottom must be narrower than middle
+
+    // Center-top dip: the very top center should be higher (larger y) than the sides
+    const midX = (minX + maxX) / 2;
+    const topBand = all.filter(p => p.y < minY + h * 0.35);
+    if (topBand.length < 4) return false;
+    const leftBump  = topBand.filter(p => p.x < midX);
+    const rightBump = topBand.filter(p => p.x > midX);
+    if (leftBump.length < 2 || rightBump.length < 2) return false;
+
+    // Both bumps must exist
+    const leftMinY  = Math.min(...leftBump.map(p => p.y));
+    const rightMinY = Math.min(...rightBump.map(p => p.y));
+    // Points at the center top should dip down
+    const centerTop = all.filter(p => Math.abs(p.x - midX) < w * 0.15 && p.y < minY + h * 0.45);
+    if (centerTop.length < 1) return false;
+    const centerMinY = Math.min(...centerTop.map(p => p.y));
+    // Center dip: center top y must be greater (lower on screen) than at least one bump
+    return centerMinY > Math.min(leftMinY, rightMinY) + h * 0.04;
+  }
+
+  // Lightning: a zigzag — must have clear left/right direction reversals AND
+  // sufficient vertical drop. Filters out wobbly circles or random scribbles.
+  function looksLikeLightning(all) {
+    if (all.length < 8) return false;
+    const xs = all.map(p => p.x), ys = all.map(p => p.y);
+    const w  = Math.max(...xs) - Math.min(...xs);
+    const h  = Math.max(...ys) - Math.min(...ys);
+    // Lightning bolts are taller than wide or roughly equal, and not tiny
+    if (h < 40) return false;
+
+    // Count direction reversals in x
+    let turns = 0;
+    // Smooth a bit to ignore micro-wiggles — sample every 3rd point
+    const sampled = all.filter((_, i) => i % 3 === 0);
+    for (let i = 2; i < sampled.length; i++) {
+      const dx1 = sampled[i-1].x - sampled[i-2].x;
+      const dx2 = sampled[i].x   - sampled[i-1].x;
+      if (Math.abs(dx1) > 2 && Math.abs(dx2) > 2 && dx1 * dx2 < 0) turns++;
     }
 
-    enemies.forEach(e => {
-      if (e.dead) { e.deadTimer--; return; }
-      const dx = CX - e.x, dy = CY - e.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 26) {
-        playerHP = Math.max(0, playerHP - 20);
-        e.dead = true;
-        e.deadTimer = 20;
-        if (playerHP <= 0) { playerHP = 0; gameOver = true; }
-        document.getElementById('hud').textContent = `Enemy reached you! HP: ${playerHP}`;
-        return;
-      }
-      e.x += (dx / dist) * e.speed;
-      e.y += (dy / dist) * e.speed;
-      if (e.hit > 0) e.hit--;
+    // A lightning bolt needs at least 2 clear direction reversals (making ≥3 segments)
+    // but not too many (that would be a scribble or circle)
+    return turns >= 2 && turns <= 12;
+  }
+
+  // Star: alternating close/far points from center — true spike pattern.
+  // We check that distances oscillate high-low-high rather than just having some outliers.
+  function looksLikeStar(all) {
+    if (all.length < 16) return false;
+    const xs = all.map(p => p.x), ys = all.map(p => p.y);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const w  = Math.max(...xs) - Math.min(...xs);
+    const h  = Math.max(...ys) - Math.min(...ys);
+    if (w < 40 || h < 40) return false;
+
+    const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
+    const avg   = dists.reduce((a, b) => a + b, 0) / dists.length;
+
+    // Smooth distances into buckets of angular segments (8 segments for a star)
+    const BUCKETS = 12;
+    const buckets = Array(BUCKETS).fill(0).map(() => ({ sum: 0, count: 0 }));
+    all.forEach((p, i) => {
+      const angle = Math.atan2(p.y - cy, p.x - cx) + Math.PI; // 0..2PI
+      const bi    = Math.floor(angle / (2 * Math.PI) * BUCKETS) % BUCKETS;
+      buckets[bi].sum   += dists[i];
+      buckets[bi].count += 1;
     });
 
-    enemies = enemies.filter(e => !e.dead || e.deadTimer > 0);
+    const bucketAvgs = buckets.map(b => b.count > 0 ? b.sum / b.count : avg);
+
+    // Count alternating spikes: a bucket is a spike if > avg*1.25, valley if < avg*0.85
+    let spikes = 0;
+    let lastWasSpike = null;
+    let transitions = 0;
+    for (const ba of bucketAvgs) {
+      const isSpike  = ba > avg * 1.2;
+      const isValley = ba < avg * 0.88;
+      if (isSpike && lastWasSpike === false) { spikes++; transitions++; }
+      if (isValley) lastWasSpike = false;
+      if (isSpike)  lastWasSpike = true;
+    }
+
+    // Need at least 4 spikes (4-pointed star) and some transitions
+    return spikes >= 4 && transitions >= 3;
   }
 
-  enemies.forEach(drawEnemyShape);
-  drawPlayer();
-  drawPlayerHPBar();
-  drawUserStrokes();
-  drawHUD();
-
-  requestAnimationFrame(loop);
-}
-
-function getPos(e) {
-  const r = canvas.getBoundingClientRect();
-  const scaleX = W / r.width;
-  const scaleY = H / r.height;
-  if (e.touches) return { x: (e.touches[0].clientX - r.left)*scaleX, y: (e.touches[0].clientY - r.top)*scaleY };
-  return { x: (e.clientX - r.left)*scaleX, y: (e.clientY - r.top)*scaleY };
-}
-
-canvas.addEventListener('mousedown', e => { drawing=true; points=[getPos(e)]; });
-canvas.addEventListener('mousemove', e => { if (!drawing) return; points.push(getPos(e)); });
-canvas.addEventListener('mouseup', () => { if (points.length>1) strokes.push([...points]); drawing=false; points=[]; });
-canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; points=[getPos(e)]; });
-canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; points.push(getPos(e)); });
-canvas.addEventListener('touchend', e => { e.preventDefault(); if (points.length>1) strokes.push([...points]); drawing=false; points=[]; });
-
-function looksLikeSquare(all) {
-  if (all.length < 8) return false;
-  const xs=all.map(p=>p.x), ys=all.map(p=>p.y);
-  const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
-  const w=maxX-minX, h=maxY-minY;
-  if (w<30||h<30) return false;
-  const ratio=Math.min(w,h)/Math.max(w,h);
-  if (ratio<0.55) return false;
-  const margin=Math.max(w,h)*0.28;
-  const onEdge=all.filter(p=>p.x-minX<margin||maxX-p.x<margin||p.y-minY<margin||maxY-p.y<margin).length;
-  if (onEdge/all.length<0.6) return false;
-  const first=all[0],last=all[all.length-1];
-  return Math.hypot(last.x-first.x,last.y-first.y)<Math.max(w,h)*0.45;
-}
-
-function looksLikeCircle(all) {
-  if (all.length < 12) return false;
-  const xs=all.map(p=>p.x), ys=all.map(p=>p.y);
-  const cx=(Math.min(...xs)+Math.max(...xs))/2;
-  const cy=(Math.min(...ys)+Math.max(...ys))/2;
-  const dists=all.map(p=>Math.hypot(p.x-cx,p.y-cy));
-  const avgD=dists.reduce((a,b)=>a+b,0)/dists.length;
-  if (avgD<20) return false;
-  const variance=dists.reduce((a,b)=>a+Math.abs(b-avgD),0)/dists.length;
-  if (variance/avgD>0.38) return false;
-  const first=all[0],last=all[all.length-1];
-  const closed=Math.hypot(last.x-first.x,last.y-first.y)<avgD*1.1;
-  const w=Math.max(...xs)-Math.min(...xs), h=Math.max(...ys)-Math.min(...ys);
-  return closed && Math.min(w,h)/Math.max(w,h)>0.5;
-}
-
-function looksLikeLine(all) {
-  if (all.length < 6) return false;
-  const xs=all.map(p=>p.x), ys=all.map(p=>p.y);
-  const w=Math.max(...xs)-Math.min(...xs);
-  const h=Math.max(...ys)-Math.min(...ys);
-  if (w < 60) return false;
-  return h/w < 0.35;
-}
-
-function looksLikeTriangle(all) {
-  if (all.length < 15) return false;
-  const xs = all.map(p => p.x);
-  const ys = all.map(p => p.y);
-  const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const w = maxX - minX, h = maxY - minY;
-  if (w < 40 || h < 40) return false;
-  const first = all[0], last = all[all.length - 1];
-  if (Math.hypot(last.x - first.x, last.y - first.y) > 50) return false;
-  let corners = 0;
-  for (let i = 2; i < all.length; i++) {
-    const p0 = all[i-2], p1 = all[i-1], p2 = all[i];
-    const a1 = Math.atan2(p1.y-p0.y, p1.x-p0.x);
-    const a2 = Math.atan2(p2.y-p1.y, p2.x-p1.x);
-    let diff = Math.abs(a2 - a1);
-    if (diff > Math.PI) diff = 2*Math.PI - diff;
-    if (diff > 0.8) corners++;
+  // Detection order matters:
+  // 1. Power-up shapes first (heart, lightning, star) — they're distinctive
+  // 2. Then line (very specific aspect ratio test)
+  // 3. Circle BEFORE square/triangle (circle is the most forgiving)
+  // 4. Triangle before square (triangle has higher variance)
+  function detectShape(all) {
+    if (all.length < 5) return null;
+    if (looksLikeHeart(all))     return 'heart';
+    if (looksLikeStar(all))      return 'star';
+    if (looksLikeLightning(all)) return 'lightning';
+    if (looksLikeLine(all))      return 'line';
+    if (looksLikeSquare(all))    return 'square';
+    if (looksLikeTriangle(all))  return 'triangle';
+    if (looksLikeCircle(all))    return 'circle';
+    return null;
   }
-  return corners >= 2 && corners <= 8;
-}
 
-function castSpell() {
-  if (gameOver) return;
-  if (strokes.length === 0) { document.getElementById('hud').textContent = 'Draw a shape first!'; return; }
-  const all = strokes.flat();
-  const sq = looksLikeSquare(all);
-  const ci = looksLikeCircle(all);
-  const li = looksLikeLine(all);
-  const tr = looksLikeTriangle(all);
+  /* ─── POWERUP LOGIC ─────────────────────────────────────────────────────── */
 
-  let hit = false;
-  for (let i = 0; i < enemies.length; i++) {
-    const e = enemies[i];
-    if (e.dead) continue;
-    if ((e.shape==='square'&&sq)||(e.shape==='circle'&&ci)||(e.shape==='line'&&li)||(e.shape==='triangle'&&tr)) {
-      e.dead = true;
-      e.deadTimer = 20;
-      document.getElementById('hud').textContent = 'Enemy defeated!';
-      hit = true;
-      break;
+  function drawPowerups(frame) {
+    powerups.forEach(p => {
+      if (p.collected) return;
+      const bob = Math.sin(frame * 0.05 + p.bobOffset) * 4;
+      ctx.save();
+      ctx.translate(p.x, p.y + bob);
+
+      ctx.shadowColor = POWERUP_COLORS[p.type];
+      ctx.shadowBlur  = 18;
+      ctx.beginPath();
+      ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fill();
+      ctx.strokeStyle = POWERUP_COLORS[p.type];
+      ctx.lineWidth   = 2.5;
+      ctx.stroke();
+
+      ctx.shadowBlur = 0;
+      ctx.font = `${p.size}px sans-serif`;
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(POWERUP_ICONS[p.type], 0, 1);
+
+      ctx.fillStyle    = '#fff';
+      ctx.font         = '10px sans-serif';
+      ctx.fillText(p.requiredShape.toUpperCase(), 0, p.size + 14);
+
+      ctx.restore();
+    });
+  }
+
+  // Check current points (live drawing) AND latest completed stroke for powerup collect.
+  function checkPowerupCollect() {
+    if (powerups.length === 0) return false;
+
+    // Build a candidate from all current input
+    const candidate = strokes.flat().concat(points);
+    if (candidate.length < 8) return false;
+
+    const detectedShape = detectShape(candidate);
+    if (!detectedShape) return false;
+
+    let collected = false;
+    powerups.forEach(p => {
+      if (p.collected) return;
+      if (detectedShape === p.requiredShape) {
+        p.collected = true;
+        collected   = true;
+        applyPowerup(p.type);
+      }
+    });
+
+    if (collected) {
+      powerups = powerups.filter(p => !p.collected);
+      clearDrawing();
+    }
+    return collected;
+  }
+
+  function applyPowerup(type) {
+    if (type === 'slow') {
+      slowActive = 600;
+      document.getElementById('hud').textContent = '🐢 Enemy movement slowed for 10 seconds!';
+    } else if (type === 'shield') {
+      shieldActive = true;
+      document.getElementById('hud').textContent = '🛡️ Shield active — next hit blocked!';
+    } else if (type === 'multicast') {
+      enemies.forEach(e => { if (!e.dead) { e.dead = true; e.deadTimer = 20; } });
+      document.getElementById('hud').textContent = '💥 Multicast — all enemies defeated!';
     }
   }
 
-  if (!hit) {
-    const needed = enemies.find(e => !e.dead);
-    const labels = {
-      square: 'Draw a SQUARE',
-      circle: 'Draw a CIRCLE',
-      line: 'Draw a HORIZONTAL LINE',
-      triangle: 'Draw a TRIANGLE'
-    };
-    document.getElementById('hud').textContent = needed
-      ? `Wrong shape! ${labels[needed.shape]}`
-      : 'No enemies!';
+  function drawActiveBuffs() {
+    let x = 12, y = 36;
+    if (slowActive > 0) {
+      ctx.font = '18px sans-serif';
+      ctx.fillText('🐢', x, y);
+      const bw = 40;
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath(); ctx.roundRect(x + 22, y - 10, bw, 8, 3); ctx.fill();
+      ctx.fillStyle = '#00CFFF';
+      ctx.beginPath(); ctx.roundRect(x + 22, y - 10, bw * (slowActive / 600), 8, 3); ctx.fill();
+      x += 72;
+    }
+    if (shieldActive) {
+      ctx.font = '18px sans-serif';
+      ctx.fillText('🛡️', x, y);
+    }
   }
 
-  clearDrawing();
-}
+  /* ─── ENEMY DRAWING ──────────────────────────────────────────────────────── */
 
-function clearDrawing() {
-  strokes = []; points = [];
-}
+  function drawComboIndicator(e) {
+    if (!e.isCombo) return;
+    const iconSize = 13, gap = 4;
+    const total = e.combo.length * (iconSize + gap) - gap;
+    let sx = e.x - total / 2;
+    const sy = e.y - e.size / 2 - 22;
 
-loop();
+    e.combo.forEach((shape, idx) => {
+      const cx2 = sx + iconSize / 2;
+      const cy2 = sy + iconSize / 2;
+      ctx.save();
+      ctx.globalAlpha = e.dead ? Math.max(0, e.deadTimer / 20) : 1;
+
+      if (idx < e.comboIndex) {
+        ctx.globalAlpha *= 0.35;
+      } else if (idx === e.comboIndex) {
+        ctx.shadowColor = '#fff'; ctx.shadowBlur = 6;
+      } else {
+        ctx.globalAlpha *= 0.55;
+      }
+
+      ctx.fillStyle   = SHAPE_COLORS[shape];
+      ctx.strokeStyle = idx === e.comboIndex ? '#fff' : 'rgba(255,255,255,0.5)';
+      ctx.lineWidth   = 1.5;
+
+      if (shape === 'square') {
+        ctx.beginPath(); ctx.roundRect(cx2 - iconSize/2, cy2 - iconSize/2, iconSize, iconSize, 2);
+        ctx.fill(); ctx.stroke();
+      } else if (shape === 'circle') {
+        ctx.beginPath(); ctx.arc(cx2, cy2, iconSize/2, 0, Math.PI*2);
+        ctx.fill(); ctx.stroke();
+      } else if (shape === 'line') {
+        ctx.beginPath(); ctx.roundRect(cx2 - iconSize/2, cy2 - iconSize*0.28, iconSize, iconSize*0.56, 2);
+        ctx.fill(); ctx.stroke();
+      } else if (shape === 'triangle') {
+        ctx.beginPath();
+        ctx.moveTo(cx2, cy2 - iconSize/2);
+        ctx.lineTo(cx2 + iconSize/2, cy2 + iconSize/2);
+        ctx.lineTo(cx2 - iconSize/2, cy2 + iconSize/2);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+      ctx.restore();
+      sx += iconSize + gap;
+    });
+  }
+
+  function drawEnemyShape(e) {
+    const { x, y, size, shape, hit } = e;
+    const pulse = hit > 0 ? 1 + Math.sin(hit * 0.4) * 0.18 : 1;
+    const s = size * pulse;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalAlpha = e.dead ? Math.max(0, e.deadTimer / 20) : 1;
+
+    if (e.isCombo) {
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth   = 4;
+      ctx.beginPath(); ctx.arc(0, 0, s / 2 + 8, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    ctx.fillStyle   = SHAPE_COLORS[shape];
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth   = 2;
+
+    if (shape === 'square') {
+      ctx.beginPath(); ctx.roundRect(-s/2, -s/2, s, s, 5); ctx.fill(); ctx.stroke();
+    } else if (shape === 'circle') {
+      ctx.beginPath(); ctx.arc(0, 0, s/2, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+    } else if (shape === 'line') {
+      ctx.beginPath(); ctx.roundRect(-s/2, -s*0.28, s, s*0.56, 5); ctx.fill(); ctx.stroke();
+    } else if (shape === 'triangle') {
+      ctx.beginPath();
+      ctx.moveTo(0, -s/2); ctx.lineTo(s/2, s/2); ctx.lineTo(-s/2, s/2);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+
+    ctx.fillStyle    = '#fff';
+    ctx.font         = `bold ${Math.round(s * 0.55)}px sans-serif`;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    const label = { square: '□', circle: '○', line: '—', triangle: '△' }[shape];
+    ctx.fillText(label, 0, shape === 'triangle' ? s * 0.1 : 0);
+    ctx.restore();
+
+    drawComboIndicator(e);
+  }
+
+  function drawPlayer() {
+    ctx.save();
+    ctx.translate(CX, CY);
+    ctx.fillStyle = '#4A90D9';
+    ctx.beginPath(); ctx.arc(0, 0, 22, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('✦', 0, 1);
+    ctx.restore();
+  }
+
+  function drawPlayerHPBar() {
+    const bw = 200, bh = 16;
+    const bx = (W - bw) / 2, by = H - 36;
+    ctx.fillStyle = 'rgba(80,80,80,0.4)';
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 6); ctx.fill();
+    const pct = playerHP / 100;
+    ctx.fillStyle = playerHP > 50 ? '#27AE60' : playerHP > 25 ? '#E67E22' : '#C0392B';
+    ctx.beginPath(); ctx.roundRect(bx, by, bw * pct, bh, 6); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(`Player HP: ${playerHP}/100`, bx + bw/2, by + 8);
+  }
+
+  function drawHUD() {
+    const e = enemies.find(e => !e.dead);
+    if (e && !gameOver) {
+      ctx.textAlign    = 'center';
+      ctx.textBaseline = 'top';
+      if (e.isCombo) {
+        const remaining = e.combo.slice(e.comboIndex);
+        ctx.fillStyle = '#FFD700'; ctx.font = 'bold 14px sans-serif';
+        ctx.fillText('⚡ COMBO ENEMY — Draw: ' + remaining.map(s => SHAPE_LABELS[s]).join(' + '), W/2, 10);
+      } else {
+        ctx.fillStyle = SHAPE_COLORS[e.shape]; ctx.font = 'bold 14px sans-serif';
+        ctx.fillText('Draw a ' + SHAPE_LABELS[e.shape], W/2, 10);
+      }
+    }
+    if (gameOver) {
+      ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 32px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Game Over', W/2, H/2 - 20);
+      ctx.font = '18px sans-serif';
+      ctx.fillText('Refresh to play again', W/2, H/2 + 20);
+    }
+  }
+
+  function drawUserStrokes() {
+    const all = strokes.flat().concat(points);
+    let color = '#4A90D9';
+    if (all.length >= 8) {
+      const s = detectShape(all);
+      if (s) color = '#3BBA4C';
+    }
+    ctx.strokeStyle = color; ctx.lineWidth = 3.5;
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    strokes.forEach(s => {
+      ctx.beginPath();
+      s.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+      ctx.stroke();
+    });
+    if (points.length > 1) {
+      ctx.beginPath();
+      points.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+      ctx.stroke();
+    }
+  }
+
+  /* ─── GAME LOOP ──────────────────────────────────────────────────────────── */
+
+  function loop() {
+    ctx.clearRect(0, 0, W, H);
+    if (!loop.frame) loop.frame = 0;
+    loop.frame++;
+
+    if (!gameOver) {
+      spawnTimer++;
+      if (spawnTimer >= spawnInterval) {
+        spawnTimer = 0; wave++;
+        spawnEnemy();
+        if (spawnInterval > 140) spawnInterval -= 5;
+      }
+
+      powerupTimer++;
+      if (powerupTimer >= powerupInterval) { powerupTimer = 0; spawnPowerup(); }
+
+      if (slowActive > 0) slowActive--;
+      const speedMult = slowActive > 0 ? 0.3 : 1;
+
+      enemies.forEach(e => {
+        if (e.dead) { e.deadTimer--; return; }
+        const dx = CX - e.x, dy = CY - e.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 26) {
+          if (shieldActive) {
+            shieldActive = false; e.dead = true; e.deadTimer = 20;
+            document.getElementById('hud').textContent = '🛡️ Shield blocked the hit!';
+          } else {
+            playerHP = Math.max(0, playerHP - 20);
+            e.dead = true; e.deadTimer = 20;
+            if (playerHP <= 0) { playerHP = 0; gameOver = true; }
+            document.getElementById('hud').textContent = `Enemy reached you! HP: ${playerHP}`;
+          }
+          return;
+        }
+        e.x += (dx / dist) * e.speed * speedMult;
+        e.y += (dy / dist) * e.speed * speedMult;
+        if (e.hit > 0) e.hit--;
+      });
+
+      enemies = enemies.filter(e => !e.dead || e.deadTimer > 0);
+    }
+
+    drawPowerups(loop.frame);
+    enemies.forEach(drawEnemyShape);
+    drawPlayer();
+    drawPlayerHPBar();
+    drawActiveBuffs();
+    drawUserStrokes();
+    drawHUD();
+
+    requestAnimationFrame(loop);
+  }
+
+  /* ─── INPUT ──────────────────────────────────────────────────────────────── */
+
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    const scaleX = W / r.width, scaleY = H / r.height;
+    if (e.touches) return { x: (e.touches[0].clientX - r.left)*scaleX, y: (e.touches[0].clientY - r.top)*scaleY };
+    return { x: (e.clientX - r.left)*scaleX, y: (e.clientY - r.top)*scaleY };
+  }
+
+  canvas.addEventListener('mousedown',  e => { drawing = true; points = [getPos(e)]; });
+  canvas.addEventListener('mousemove',  e => { if (!drawing) return; points.push(getPos(e)); checkPowerupCollect(); });
+  canvas.addEventListener('mouseup',    () => {
+    if (points.length > 1) strokes.push([...points]);
+    drawing = false; points = [];
+    castSpell();
+  });
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; points = [getPos(e)]; });
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); if (!drawing) return; points.push(getPos(e)); checkPowerupCollect(); });
+  canvas.addEventListener('touchend',   e => {
+    e.preventDefault();
+    if (points.length > 1) strokes.push([...points]);
+    drawing = false; points = [];
+    castSpell();
+  });
+
+  /* ─── SPELL CASTING ──────────────────────────────────────────────────────── */
+
+  function castSpell() {
+    if (gameOver) return;
+    if (strokes.length === 0) return;
+
+    // First check if this matches a powerup
+    if (checkPowerupCollect()) return;
+
+    const target = enemies.find(e => !e.dead);
+    if (!target) { clearDrawing(); return; }
+
+    if (!target.isCombo) {
+      const all      = strokes.flat();
+      const detected = detectShape(all);
+      if (detected === target.shape) {
+        target.dead = true; target.deadTimer = 20;
+        document.getElementById('hud').textContent = 'Enemy defeated!';
+      } else {
+        document.getElementById('hud').textContent =
+          `Wrong shape! Drew "${detected || 'nothing'}" — need ${SHAPE_LABELS[target.shape]}`;
+      }
+      clearDrawing();
+    } else {
+      const combo = target.combo;
+      if (strokes.length < combo.length) {
+        const remaining = combo.length - strokes.length;
+        document.getElementById('hud').textContent =
+          `Combo: ${strokes.length}/${combo.length} drawn — draw ${remaining} more`;
+        return;
+      }
+
+      let allMatch = true;
+      for (let i = 0; i < combo.length; i++) {
+        const detected = detectShape(strokes[i]);
+        if (detected !== combo[i]) {
+          allMatch = false;
+          document.getElementById('hud').textContent =
+            `Shape ${i+1} wrong! Needed ${SHAPE_LABELS[combo[i]]}, drew "${detected || 'nothing'}"`;
+          break;
+        }
+      }
+      if (allMatch) {
+        target.dead = true; target.deadTimer = 20;
+        document.getElementById('hud').textContent = '⚡ COMBO DEFEATED!';
+      }
+      clearDrawing();
+    }
+  }
+
+  function clearDrawing() {
+    strokes = []; points = [];
+  }
+
+  loop();
 </script>
 </body>
 </html>
