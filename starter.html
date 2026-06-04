@@ -69,6 +69,7 @@ let level2Started = false;
 let enemyKillCount = 0;
 let bossSpawned = false;
 const LEVEL_SCREEN_DURATION = 180;
+let gameTime = 0;
 
 const SHAPES = ['circle', 'square', 'line', 'triangle'];
 const SHAPE_COLORS = {
@@ -101,6 +102,7 @@ function spawnEnemy() {
   const y = CY + Math.sin(angle) * r;
   const speed = 0.35 + Math.random() * 0.2 + wave * 0.05;
 
+  // ~30% chance of combo enemy after wave 2
   const isCombo = wave > 2 && Math.random() < 0.3;
 
   if (isCombo) {
@@ -130,6 +132,7 @@ function spawnBoss() {
   const x = CX + Math.cos(angle) * r;
   const y = CY + Math.sin(angle) * r;
   
+  // Bosses move slower but require 4 keys
   const speed = 0.25; 
   const combo = makeCombo(4);
 
@@ -150,7 +153,8 @@ function drawComboIndicator(e) {
   const gap = 5;
   const total = e.combo.length * (iconSize + gap) - gap;
   let sx = e.x - total / 2;
-  const sy = e.y - e.size / 2 - (e.isBoss ? 30 : 22);
+const ih = 80; // match what you have in drawEnemyShape
+const sy = e.y - ih/2 - (e.isBoss ? 50 : 40); // push it above the single shape indicator
 
   e.combo.forEach((shape, idx) => {
     const cx = sx + iconSize / 2;
@@ -175,6 +179,7 @@ function drawComboIndicator(e) {
       ctx.beginPath();
       ctx.roundRect(cx - iconSize/2, cy - iconSize/2, iconSize, iconSize, 2);
       ctx.fill(); ctx.stroke();
+      // the circle and line icons 
     } else if (shape === 'circle') {
       ctx.beginPath();
       ctx.arc(cx, cy, iconSize/2, 0, Math.PI*2);
@@ -197,83 +202,65 @@ function drawComboIndicator(e) {
   });
 }
 
+const enemyImg = new Image();
+enemyImg.src = 'ghost.png';
+
 function drawEnemyShape(e) {
   const { x, y, size, shape, hit } = e;
   const pulse = hit > 0 ? 1 + Math.sin(hit * 0.4) * 0.18 : 1;
   const s = size * pulse;
   ctx.save();
-  ctx.translate(x, y);
   ctx.globalAlpha = e.dead ? Math.max(0, e.deadTimer / 20) : 1;
 
-  if (e.isBoss) {
-    ctx.strokeStyle = (Math.floor(Date.now() / 150) % 2 === 0) ? '#FF1493' : '#FFD700';
-    ctx.lineWidth = 6;
-    ctx.shadowColor = '#FF0000';
-    ctx.shadowBlur = 12;
-    ctx.beginPath();
-    ctx.arc(0, 0, s / 2 + 10, 0, Math.PI * 2);
-    ctx.stroke();
-  } else if (e.isCombo) {
-    ctx.strokeStyle = '#FFD700';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(0, 0, s / 2 + 8, 0, Math.PI * 2);
-    ctx.stroke();
-  }
+  // Draw enemy image
+  const iw = 60, ih = 80; // adjust to your image's proportions
+  ctx.drawImage(enemyImg, x - iw/2, y - ih/2, iw, ih);
 
+  // Draw shape indicator above the enemy's head
+  ctx.translate(x, y);
   ctx.fillStyle = SHAPE_COLORS[shape];
   ctx.strokeStyle = '#fff';
-  ctx.lineWidth = e.isBoss ? 4 : 2;
+  ctx.lineWidth = 2;
+
+const indicatorY = -ih/2 - 10; // closer to the head, combo icons float above this
+  const is = 22; // indicator size
 
   if (shape === 'square') {
     ctx.beginPath();
-    ctx.roundRect(-s/2, -s/2, s, s, 5);
+    ctx.roundRect(-is/2, indicatorY - is/2, is, is, 4);
     ctx.fill(); ctx.stroke();
   } else if (shape === 'circle') {
     ctx.beginPath();
-    ctx.arc(0, 0, s/2, 0, Math.PI*2);
+    ctx.arc(0, indicatorY, is/2, 0, Math.PI*2);
     ctx.fill(); ctx.stroke();
   } else if (shape === 'line') {
     ctx.beginPath();
-    ctx.roundRect(-s/2, -s*0.28, s, s*0.56, 5);
+    ctx.roundRect(-is/2, indicatorY - is*0.28, is, is*0.56, 4);
     ctx.fill(); ctx.stroke();
   } else if (shape === 'triangle') {
     ctx.beginPath();
-    ctx.moveTo(0, -s/2);
-    ctx.lineTo(s/2, s/2);
-    ctx.lineTo(-s/2, s/2);
+    ctx.moveTo(0, indicatorY - is/2);
+    ctx.lineTo(is/2, indicatorY + is/2);
+    ctx.lineTo(-is/2, indicatorY + is/2);
     ctx.closePath();
     ctx.fill(); ctx.stroke();
   }
 
-  ctx.fillStyle = '#fff';
-  ctx.font = `bold ${Math.round(s * 0.35)}px sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const label = { square: '□', circle: '○', line: '—', triangle: '△' }[shape];
-  ctx.fillText(label, 0, shape === 'triangle' ? s * 0.1 : 0);
+  
   ctx.restore();
-
   drawComboIndicator(e);
 }
 
+const playerImg = new Image();
+playerImg.src = 'cat.png'; // put your image file in the same folder
+
 function drawPlayer() {
-  ctx.save();
-  ctx.translate(CX, CY);
-  ctx.fillStyle = '#4A90D9';
-  ctx.beginPath();
-  ctx.arc(0, 0, 22, 0, Math.PI*2);
-  ctx.fill();
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 18px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('✦', 0, 1);
-  ctx.restore();
+  const w = 80;
+  const h = 100; 
+  ctx.drawImage(playerImg, CX - w/2, CY - h/2, w, h);
+
 }
+
 
 function drawPlayerHPBar() {
   const bw = 200, bh = 16;
@@ -357,8 +344,8 @@ function drawLevelScreen(title, subtitle) {
 function drawUserStrokes() {
   const all = strokes.flat().concat(points);
   let color = '#4A90D9';
-  if (all.length >= 6) {
-    if (detectShape(all)) color = '#3BBA4C';
+  if (all.length >= 8) {
+    if (looksLikeSquare(all) || looksLikeCircle(all) || looksLikeLine(all) || looksLikeTriangle(all)) color = '#3BBA4C';
   }
   ctx.strokeStyle = color;
   ctx.lineWidth = 3.5;
@@ -398,14 +385,13 @@ function loop() {
   if (!gameOver) {
     const goal = level === 1 ? 5 : 10;
 
-    const readyForBoss = (enemyKillCount === goal - 1);
-
-    if (readyForBoss && !bossSpawned && enemies.length === 0) {
+    // Check if it's time to spawn a boss instead of normal minions
+    if (enemyKillCount === (goal - 1) && !bossSpawned && enemies.length === 0) {
       spawnBoss();
     }
 
-    // Only spawn standard enemies if the boss isn't here yet and we aren't waiting for the boss trigger
-    if (!bossSpawned && !readyForBoss) {
+    // Minion continuous spawning only happens if the boss isn't out yet
+    if (!bossSpawned) {
       spawnTimer++;
       if (spawnTimer >= spawnInterval) {
         spawnTimer = 0;
@@ -415,6 +401,7 @@ function loop() {
       }
     }
 
+    // Handle Level transitions after Boss is executed
     if (enemyKillCount >= 5 && !level2Started) {
       level = 2;
       enemyKillCount = 0;
@@ -444,10 +431,27 @@ function loop() {
       e.x += (dx / dist) * e.speed;
       e.y += (dy / dist) * e.speed;
       if (e.hit > 0) e.hit--;
+
+      if (e.isBoss) {
+        e.scrambleTimer = (e.scrambleTimer || 0) + 1;
+        if (e.scrambleTimer > 100) {
+          e.scrambleTimer = 0;
+          const remaining = e.combo.slice(e.comboIndex);
+          for (let i = remaining.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+          }
+          e.combo = [...e.combo.slice(0, e.comboIndex), ...remaining];
+          e.shape = e.combo[e.comboIndex];
+          document.getElementById('hud').textContent = 'The boss scrambled its combo!';
+        }
+      }
     });
 
     enemies = enemies.filter(e => !e.dead || e.deadTimer > 0);
   }
+
+  gameTime++;
 
   enemies.forEach(drawEnemyShape);
   drawPlayer();
@@ -473,60 +477,64 @@ canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; p
 canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; points.push(getPos(e)); });
 canvas.addEventListener('touchend', e => { e.preventDefault(); if (points.length>1) strokes.push([...points]); drawing=false; points=[]; });
 
-// ROBUST GEOMETRIC SHAPE ENGINE
-function detectShape(all) {
-  if (all.length < 6) return null;
+function looksLikeSquare(all) {
+  if (all.length < 10) return false;
+  const xs = all.map(p => p.x), ys = all.map(p => p.y);
+  const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+  const ratio = Math.min(w, h) / Math.max(w, h);
+  if (w < 20 || h < 20 || ratio < 0.5) return false;
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
+  const avgD = dists.reduce((a, b) => a + b, 0) / dists.length;
+  const variance = dists.reduce((a, b) => a + Math.abs(b - avgD), 0) / dists.length;
+  if (variance / avgD < 0.05) return false; 
+  return true; 
+}
 
+function looksLikeCircle(all) {
+  if (all.length < 15) return false;
   const xs = all.map(p => p.x), ys = all.map(p => p.y);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const minY = Math.min(...ys), maxY = Math.max(...ys);
   const w = maxX - minX, h = maxY - minY;
-  
-  if (w < 15 && h < 15) return null;
-
-  if (w >= 45 && h / w < 0.35) return 'line';
-
+  const ratio = Math.min(w, h) / Math.max(w, h);
+  if (ratio < 0.6) return false;
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
+  const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
+  const avgD = dists.reduce((a, b) => a + b, 0) / dists.length;
+  const variance = dists.reduce((a, b) => a + Math.abs(b - avgD), 0) / dists.length;
+  return (variance / avgD < 0.2); 
+}
 
-  const radiusEst = (w + h) / 4;
-  let circleDeviationSum = 0;
-  all.forEach(p => {
-    const d = Math.hypot(p.x - cx, p.y - cy);
-    circleDeviationSum += Math.abs(d - radiusEst);
-  });
-  const circleError = circleDeviationSum / all.length / radiusEst;
+function looksLikeLine(all) {
+  if (all.length < 6) return false;
+  const xs=all.map(p=>p.x), ys=all.map(p=>p.y);
+  const w=Math.max(...xs)-Math.min(...xs);
+  const h=Math.max(...ys)-Math.min(...ys);
+  if (w < 60) return false;
+  return h/w < 0.35;
+}
 
-  const aspect = Math.min(w, h) / Math.max(w, h);
-  if (aspect > 0.65 && circleError < 0.18) {
-    return 'circle';
-  }
+function looksLikeTriangle(all) {
+  if (all.length < 10) return false;
+  const xs = all.map(p => p.x), ys = all.map(p => p.y);
+  const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+  if (w < 20 || h < 20) return false;
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
+  const avgD = dists.reduce((a, b) => a + b, 0) / dists.length;
+  const variance = dists.reduce((a, b) => a + Math.abs(b - avgD), 0) / dists.length;
+  return (variance / avgD > 0.15); 
+}
 
-  const topHalfPoints = all.filter(p => p.y < minY + h * 0.3);
-  const bottomHalfPoints = all.filter(p => p.y > maxY - h * 0.3);
-  
-  let topWidth = 0, bottomWidth = 0;
-  if (topHalfPoints.length > 0) {
-    const txs = topHalfPoints.map(p => p.x);
-    topWidth = Math.max(...txs) - Math.min(...txs);
-  }
-  if (bottomHalfPoints.length > 0) {
-    const bxs = bottomHalfPoints.map(p => p.x);
-    bottomWidth = Math.max(...bxs) - Math.min(...bxs);
-  }
-
-  if (bottomWidth > 0 && topWidth / bottomWidth < 0.45 && aspect > 0.5) {
-    return 'triangle';
-  }
-
-  if (aspect > 0.6 && circleError >= 0.15) {
-    return 'square';
-  }
-
-  if (aspect > 0.5) {
-    return circleError < 0.23 ? 'circle' : 'square';
-  }
-
+function detectShape(all) {
+  if (looksLikeLine(all)) return 'line';
+  if (looksLikeTriangle(all)) return 'triangle';
+  if (looksLikeSquare(all)) return 'square';
+  if (looksLikeCircle(all)) return 'circle';
   return null;
 }
 
@@ -537,10 +545,9 @@ function castSpell() {
   const target = enemies.find(e => !e.dead);
   if (!target) { document.getElementById('hud').textContent = 'No enemies!'; clearDrawing(); return; }
 
-  const allCurrentPoints = strokes.flat();
-  const detected = detectShape(allCurrentPoints);
-
   if (!target.isCombo) {
+    const all = strokes.flat();
+    const detected = detectShape(all);
     if (detected === target.shape) {
       target.dead = true;
       target.deadTimer = 20;
@@ -550,23 +557,34 @@ function castSpell() {
       document.getElementById('hud').textContent = `Wrong shape! Draw a ${SHAPE_LABELS[target.shape]}`;
     }
   } else {
-    const requiredShape = target.combo[target.comboIndex];
-    
-    if (detected === requiredShape) {
-      target.comboIndex++;
-      target.hit = 15;
-      
-      if (target.comboIndex >= target.combo.length) {
-        target.dead = true;
-        target.deadTimer = 20;
-        enemyKillCount++;
-        document.getElementById('hud').textContent = target.isBoss ? 'BOSS DESTROYED!' : 'COMBO DEFEATED!';
+    // Combo & Boss evaluation logic
+    const combo = target.combo;
+    let strokesUsed = 0;
+
+    for (let i = target.comboIndex; i < combo.length; i++) {
+      if (strokesUsed >= strokes.length) break;
+
+      const detected = detectShape(strokes[strokesUsed]);
+      if (detected === combo[i]) {
+        target.comboIndex++;
+        strokesUsed++;
+        if (target.comboIndex < combo.length) {
+          target.shape = combo[target.comboIndex]; // Advance targeted icon shape visual
+        }
       } else {
-        target.shape = target.combo[target.comboIndex];
-        document.getElementById('hud').textContent = `Good hit! ${target.combo.length - target.comboIndex} shapes remaining!`;
+        document.getElementById('hud').textContent = `Incorrect combo shape! Needed ${SHAPE_LABELS[combo[i]]}`;
+        clearDrawing();
+        return;
       }
+    }
+
+    if (target.comboIndex >= combo.length) {
+      target.dead = true;
+      target.deadTimer = 20;
+      enemyKillCount++;
+      document.getElementById('hud').textContent = target.isBoss ? 'BOSS DESTROYED!' : 'COMBO DEFEATED!';
     } else {
-      document.getElementById('hud').textContent = `Incorrect combo shape! Needed ${SHAPE_LABELS[requiredShape]}`;
+      document.getElementById('hud').textContent = `Good hit! Keep going, ${combo.length - target.comboIndex} shapes remaining!`;
     }
   }
 
