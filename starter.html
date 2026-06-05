@@ -11,15 +11,15 @@
     justify-content: center;
     min-height: 100vh;
     margin: 0;
-    background: #6f4e3f;
-    font-family: sans-serif;
+    background: #1a1a2e  ;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
     gap: 16px;
   }
   canvas {
     border: 1px solid #ffffff;
     border-radius: 16px;
     cursor: crosshair;
-    background: #2b1d16;
+    background: url('library.png') center/cover no-repeat;
     touch-action: none;
   }
   .controls { display: flex; gap: 12px; }
@@ -33,7 +33,7 @@
     cursor: pointer;
   }
   button:hover { background: rgba(255,255,255,0.1); }
-  #hud { font-size: 15px; min-height: 24px; color: #fff; text-shadow: 0 0 4px rgba(0,0,0,0.5); }
+  #hud { font-size: 20px; min-height: 24px; color: #fff; text-shadow: 0 0 4px rgba(0,0,0,0.5); }
 </style>
 </head>
 <body>
@@ -202,8 +202,12 @@ const sy = e.y - ih/2 - (e.isBoss ? 50 : 40); // push it above the single shape 
   });
 }
 
-const enemyImg = new Image();
-enemyImg.src = 'ghost.png';
+const ghostMad = new Image();
+ghostMad.src = 'ghost-mad.png';
+
+const ghostDead = new Image();
+ghostDead.src = 'ghost-dead.png';
+
 
 function drawEnemyShape(e) {
   const { x, y, size, shape, hit } = e;
@@ -213,8 +217,10 @@ function drawEnemyShape(e) {
   ctx.globalAlpha = e.dead ? Math.max(0, e.deadTimer / 20) : 1;
 
   // Draw enemy image
-  const iw = 60, ih = 80; // adjust to your image's proportions
-  ctx.drawImage(enemyImg, x - iw/2, y - ih/2, iw, ih);
+  const iw = 60, ih = 70; // adjust to your image's proportions
+  const frame = e.dead ? ghostDead : ghostMad;
+  ctx.drawImage(frame, x - iw/2 , y - ih/2, iw, ih);
+
 
   // Draw shape indicator above the enemy's head
   ctx.translate(x, y);
@@ -255,11 +261,19 @@ const playerImg = new Image();
 playerImg.src = 'cat.png'; // put your image file in the same folder
 
 function drawPlayer() {
-  const w = 80;
-  const h = 100; 
-  ctx.drawImage(playerImg, CX - w/2, CY - h/2, w, h);
+  const w = 125, h = 170;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.beginPath();
+  ctx.ellipse(CX + 5, CY + 60, 30, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 
+  ctx.drawImage(playerImg, CX - w/2, CY - h/2, w, h);
 }
+
+
+
 
 
 function drawPlayerHPBar() {
@@ -311,7 +325,7 @@ function drawHUD() {
       ctx.fillText('COMBO ENEMY — Draw: ' + text, W / 2, 10);
     } else {
       ctx.fillStyle = SHAPE_COLORS[e.shape];
-      ctx.font = 'bold 14px sans-serif';
+      ctx.font = 'bold 16px sans-serif';
       ctx.fillText('Draw a ' + SHAPE_LABELS[e.shape], W / 2, 10);
     }
   }
