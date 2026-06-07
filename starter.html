@@ -39,10 +39,6 @@
 <body>
 
 <canvas id="c" width="860" height="660"></canvas>
-<div class="controls">
-  <button onclick="castSpell()">Cast</button>
-  <button onclick="clearDrawing()">Clear</button>
-</div>
 <div id="hud">Draw the required shape to defeat each enemy!</div>
 
 <script>
@@ -62,12 +58,14 @@ let spawnTimer = 0;
 let spawnInterval = 300;
 let wave = 0;
 let level = 1;
+let clearTimeoutId = null;
 let showingLevel1 = true;
 let showingLevel2 = false;
 let levelScreenTimer = 0;
 let level2Started = false;
 let enemyKillCount = 0;
 let bossSpawned = false;
+let catFacingRight = true;
 const LEVEL_SCREEN_DURATION = 180;
 let gameTime = 0;
 
@@ -123,6 +121,20 @@ function spawnEnemy() {
       isCombo: false, isBoss: false
     });
   }
+}
+
+function tryCastAndClear() {
+  if (strokes.length === 0) return;
+
+  castSpell();
+
+  if (clearTimeoutId) {
+    clearTimeout(clearTimeoutId);
+  }
+
+  clearTimeoutId = setTimeout(() => {
+    clearDrawing();
+  }, 2000);
 }
 
 function spawnBoss() {
@@ -262,16 +274,24 @@ playerImg.src = 'cat.png'; // put your image file in the same folder
 
 function drawPlayer() {
   const w = 125, h = 170;
+
   ctx.save();
+
   ctx.fillStyle = 'rgba(0,0,0,0.35)';
   ctx.beginPath();
   ctx.ellipse(CX + 5, CY + 60, 30, 8, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  ctx.translate(CX, 0);
+
+  if (!catFacingRight) {
+    ctx.scale(-1, 1);
+  }
+
+  ctx.drawImage(playerImg, -w / 2, CY - h / 2, w, h);
+
   ctx.restore();
-
-  ctx.drawImage(playerImg, CX - w/2, CY - h/2, w, h);
 }
-
 
 
 
@@ -484,12 +504,64 @@ function getPos(e) {
   return { x: (e.clientX - r.left)*scaleX, y: (e.clientY - r.top)*scaleY };
 }
 
-canvas.addEventListener('mousedown', e => { drawing=true; points=[getPos(e)]; });
-canvas.addEventListener('mousemove', e => { if (!drawing) return; points.push(getPos(e)); });
-canvas.addEventListener('mouseup', () => { if (points.length>1) strokes.push([...points]); drawing=false; points=[]; });
-canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; points=[getPos(e)]; });
-canvas.addEventListener('touchmove', e => { e.preventDefault(); if (!drawing) return; points.push(getPos(e)); });
-canvas.addEventListener('touchend', e => { e.preventDefault(); if (points.length>1) strokes.push([...points]); drawing=false; points=[]; });
+canvas.addEventListener('mousedown', e => {
+  drawing = true;
+  const pos = getPos(e);
+  updateCatFacing(pos);
+  points = [pos];
+});
+canvas.addEventListener('mousemove', e => {
+  if (!drawing) return;
+
+  const pos = getPos(e);
+  updateCatFacing(pos);
+  points.push(pos);
+});
+
+canvas.addEventListener('mouseup', () => {
+  if (points.length > 1) {
+    strokes.push([...points]);
+  }
+
+  drawing = false;
+  points = [];
+
+  tryCastAndClear();
+});
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+
+  const pos = getPos(e);
+  updateCatFacing(pos);
+
+  drawing = true;
+  points = [pos];
+});
+
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  if (!drawing) return;
+
+  const pos = getPos(e);
+  updateCatFacing(pos);
+
+  points.push(pos);
+});
+
+canvas.addEventListener('touchend', e => {
+  e.preventDefault();
+
+  if (points.length > 1) {
+    strokes.push([...points]);
+  }
+
+  drawing = false;
+  points = [];
+
+  tryCastAndClear();
+});
+
 
 function looksLikeSquare(all) {
   if (all.length < 10) return false;
@@ -507,19 +579,34 @@ function looksLikeSquare(all) {
 }
 
 function looksLikeCircle(all) {
-  if (all.length < 15) return false;
-  const xs = all.map(p => p.x), ys = all.map(p => p.y);
-  const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const minY = Math.min(...ys), maxY = Math.max(...ys);
-  const w = maxX - minX, h = maxY - minY;
+  if (all.length < 10) return false;
+
+  const xs = all.map(p => p.x);
+  const ys = all.map(p => p.y);
+
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  const w = maxX - minX;
+  const h = maxY - minY;
+
   const ratio = Math.min(w, h) / Math.max(w, h);
-  if (ratio < 0.6) return false;
+
+  if (ratio < 0.45) return false;
+
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
+
   const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
-  const avgD = dists.reduce((a, b) => a + b, 0) / dists.length;
-  const variance = dists.reduce((a, b) => a + Math.abs(b - avgD), 0) / dists.length;
-  return (variance / avgD < 0.2); 
+
+  const avgD = dists.reduce((a,b)=>a+b,0) / dists.length;
+
+  const variance =
+    dists.reduce((a,b)=>a+Math.abs(b-avgD),0) / dists.length;
+
+  return variance / avgD < 0.35;
 }
 
 function looksLikeLine(all) {
@@ -552,6 +639,10 @@ function detectShape(all) {
   return null;
 }
 
+function faceKilledEnemy(enemy) {
+  catFacingRight = enemy.x > CX;
+}
+
 function castSpell() {
   if (gameOver) return;
   if (strokes.length === 0) { document.getElementById('hud').textContent = 'Draw a shape first!'; return; }
@@ -563,6 +654,13 @@ function castSpell() {
     const all = strokes.flat();
     const detected = detectShape(all);
     if (detected === target.shape) {
+      clearDrawing();
+
+      if (clearTimeoutId) {
+        clearTimeout(clearTimeoutId);
+      }
+
+      faceKilledEnemy(target);
       target.dead = true;
       target.deadTimer = 20;
       document.getElementById('hud').textContent = 'Enemy defeated!';
@@ -593,6 +691,13 @@ function castSpell() {
     }
 
     if (target.comboIndex >= combo.length) {
+
+      clearDrawing();
+
+      if (clearTimeoutId) {
+        clearTimeout(clearTimeoutId);
+      }
+      faceKilledEnemy(target);
       target.dead = true;
       target.deadTimer = 20;
       enemyKillCount++;
@@ -607,6 +712,10 @@ function castSpell() {
 
 function clearDrawing() {
   strokes = []; points = [];
+}
+
+function updateCatFacing(pos) {
+  catFacingRight = pos.x > CX;
 }
 
 loop();
