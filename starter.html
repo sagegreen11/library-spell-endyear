@@ -79,6 +79,37 @@ let turtleActive = false;
 let turtleTimer = 0;
 
 
+const bgMusic = new Audio("background.mp3");
+bgMusic.loop = true;
+bgMusic.volume = 0.4;
+
+const spellcastSfx = new Audio("spellcast.mp3");
+spellcastSfx.volume = 0.7;
+
+const shieldSfx = new Audio("shield.mp3");
+shieldSfx.volume = 0.8;
+
+const turtleSfx = new Audio("turtle.mp3");
+turtleSfx.volume = 0.8;
+
+function playSound(sound) {
+  sound.currentTime = 0;
+  sound.play().catch(() => {});
+}
+
+let musicStarted = false;
+
+function startMusic() {
+  if (musicStarted) return;
+
+  musicStarted = true;
+  bgMusic.play().catch(() => {});
+}
+
+canvas.addEventListener("mousedown", startMusic);
+canvas.addEventListener("touchstart", startMusic);
+
+
 const SHAPES = ['circle', 'square', 'line', 'triangle'];
 const SHAPE_COLORS = {
   circle: '#4A90D9',
@@ -871,6 +902,7 @@ function faceKilledEnemy(enemy) {
 }
 
 function castSpell() {
+      playSound(spellcastSfx);
     const drawn = detectPowerupShape(strokes.flat());
 
   const powerup = powerups.find(
@@ -882,18 +914,21 @@ function castSpell() {
     switch (powerup.type) {
 
       case "heart":
+        playSound(shieldSfx);
         playerHP = Math.min(100, playerHP + 20);
         document.getElementById('hud').textContent =
           'Collected Heart!';
         break;
 
       case "shield":
+        playSound(shieldSfx);
         shieldActive = true;
         document.getElementById('hud').textContent =
           'Collected Shield!';
         break;
 
       case "turtle":
+        playSound(turtleSfx);
         turtleActive = true;
         turtleTimer = 600;
         document.getElementById('hud').textContent =
