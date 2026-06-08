@@ -69,6 +69,16 @@ let catFacingRight = true;
 const LEVEL_SCREEN_DURATION = 180;
 let gameTime = 0;
 
+let powerups = [];
+
+let powerupSpawnTimer = 0;
+const POWERUP_SPAWN_INTERVAL = 420; // 7 sec @ 60fps
+
+let shieldActive = false;
+let turtleActive = false;
+let turtleTimer = 0;
+
+
 const SHAPES = ['circle', 'square', 'line', 'triangle'];
 const SHAPE_COLORS = {
   circle: '#4A90D9',
@@ -270,7 +280,16 @@ const indicatorY = -ih/2 - 10; // closer to the head, combo icons float above th
 }
 
 const playerImg = new Image();
-playerImg.src = 'cat.png'; // put your image file in the same folder
+playerImg.src = 'cat.png';
+const turtleImg = new Image();
+turtleImg.src = "turtle.png";
+
+const shieldImg = new Image();
+shieldImg.src = "shield.png";
+
+const heartImg = new Image();
+heartImg.src = "heart.png";
+// put your image file in the same folder
 
 function drawPlayer() {
   const w = 125, h = 170;
@@ -293,7 +312,110 @@ function drawPlayer() {
   ctx.restore();
 }
 
+function spawnPowerup() {
+  const types = ["heart", "shield", "turtle"];
 
+  const type =
+    types[Math.floor(Math.random() * types.length)];
+
+  let x, y;
+  const minDistance = 140; // distance from cat center
+
+  do {
+    x = 80 + Math.random() * (W - 160);
+    y = 80 + Math.random() * (H - 160);
+  } while (
+    Math.hypot(x - CX, y - CY) < minDistance
+  );
+
+  powerups.push({
+    type,
+    x,
+    y,
+    timer: 600,
+
+    // for bobbing
+    bobOffset: Math.random() * Math.PI * 2
+  });
+}
+
+function drawPowerup(p) {
+  let size = 55;
+
+  let img;
+
+  if (p.type === "turtle") {
+    size = 90;
+  }
+
+  switch (p.type) {
+    case "heart": img = heartImg; break;
+    case "shield": img = shieldImg; break;
+    case "turtle": img = turtleImg; break;
+  }
+
+  const bobY =
+  Math.sin(gameTime * 0.08 + p.bobOffset) * 8;
+
+  ctx.drawImage(
+    img,
+    p.x - size / 2,
+    p.y - size / 2 + bobY,
+    size,
+    size
+  );
+
+  ctx.save();
+
+    const iconY = p.y - size / 2 - 18 + bobY;
+    const iconSize = 20;
+
+    ctx.fillStyle = "#FFD700";
+    ctx.strokeStyle = "#FFF";
+    ctx.lineWidth = 2;
+
+    switch (p.type) {
+
+      // V for turtle
+      case "turtle":
+        ctx.beginPath();
+        ctx.moveTo(p.x - iconSize/2, iconY - iconSize/2);
+        ctx.lineTo(p.x, iconY + iconSize/2);
+        ctx.lineTo(p.x + iconSize/2, iconY - iconSize/2);
+        ctx.stroke();
+        break;
+
+      // lightning for shield
+      case "shield":
+        ctx.beginPath();
+        ctx.moveTo(p.x - 5, iconY - 10);
+        ctx.lineTo(p.x + 4, iconY - 2);
+        ctx.lineTo(p.x - 2, iconY - 2);
+        ctx.lineTo(p.x + 6, iconY + 10);
+        ctx.stroke();
+        break;
+
+      // heart for heart
+      case "heart":
+        ctx.beginPath();
+        ctx.moveTo(p.x, iconY + 8);
+        ctx.bezierCurveTo(
+          p.x - 15, iconY - 8,
+          p.x - 20, iconY + 12,
+          p.x, iconY + 18
+        );
+        ctx.bezierCurveTo(
+          p.x + 20, iconY + 12,
+          p.x + 15, iconY - 8,
+          p.x, iconY + 8
+        );
+        ctx.stroke();
+        break;
+    }
+
+    ctx.restore();
+
+}
 
 
 function drawPlayerHPBar() {
@@ -455,15 +577,30 @@ function loop() {
       const dx = CX - e.x, dy = CY - e.y;
       const dist = Math.hypot(dx, dy);
       if (dist < 26) {
-        playerHP = Math.max(0, playerHP - (e.isBoss ? 40 : 20));
+      if (shieldActive) {
+
+        shieldActive = false;
+
+        document.getElementById('hud').textContent =
+          'Shield blocked damage!';
+
+      } else {
+
+        playerHP = Math.max(
+          0,
+          playerHP - (e.isBoss ? 40 : 20)
+        );
+
+      }
         e.dead = true;
         e.deadTimer = 20;
         if (playerHP <= 0) { playerHP = 0; gameOver = true; }
         document.getElementById('hud').textContent = e.isBoss ? 'The Boss struck you!' : `Enemy reached you!`;
         return;
       }
-      e.x += (dx / dist) * e.speed;
-      e.y += (dy / dist) * e.speed;
+      const speedMult = turtleActive ? 0.5 : 1;
+      e.x += (dx / dist) * e.speed * speedMult;
+      e.y += (dy / dist) * e.speed * speedMult;
       if (e.hit > 0) e.hit--;
 
       if (e.isBoss) {
@@ -486,12 +623,31 @@ function loop() {
   }
 
   gameTime++;
-
+  powerups.forEach(drawPowerup);
   enemies.forEach(drawEnemyShape);
   drawPlayer();
   drawPlayerHPBar();
   drawUserStrokes();
   drawHUD();
+
+  powerupSpawnTimer++;
+
+  if (powerupSpawnTimer >= POWERUP_SPAWN_INTERVAL) {
+    powerupSpawnTimer = 0;
+    spawnPowerup();
+  }
+
+  powerups.forEach(p => p.timer--);
+
+  powerups = powerups.filter(p => p.timer > 0);
+
+    if (turtleActive) {
+    turtleTimer--;
+
+    if (turtleTimer <= 0) {
+      turtleActive = false;
+    }
+  }
 
   requestAnimationFrame(loop);
 }
@@ -631,6 +787,77 @@ function looksLikeTriangle(all) {
   return (variance / avgD > 0.15); 
 }
 
+function looksLikeV(all) {
+  if (all.length < 8) return false;
+
+  const first = all[0];
+  const mid = all[Math.floor(all.length / 2)];
+  const last = all[all.length - 1];
+
+  return (
+    mid.y > first.y &&
+    mid.y > last.y &&
+    Math.abs(first.x - last.x) > 40
+  );
+}
+
+function looksLikeLightning(all) {
+  if (all.length < 6) return false;
+
+  const xs = all.map(p => p.x);
+  const ys = all.map(p => p.y);
+
+  const w = Math.max(...xs) - Math.min(...xs);
+  const h = Math.max(...ys) - Math.min(...ys);
+
+  if (w < 20 || h < 20) return false;
+
+  let turns = 0;
+
+  for (let i = 2; i < all.length; i++) {
+    const dx1 = all[i - 1].x - all[i - 2].x;
+    const dx2 = all[i].x - all[i - 1].x;
+
+    if (dx1 * dx2 < 0) turns++;
+  }
+
+  return turns >= 1;
+}
+
+function looksLikeHeart(all) {
+  if (all.length < 8) return false;
+
+  const xs = all.map(p => p.x);
+  const ys = all.map(p => p.y);
+
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+
+  const w = maxX - minX;
+  const h = maxY - minY;
+
+  if (w < 25 || h < 25) return false;
+
+  const top = all.reduce((a,b)=>a.y<b.y?a:b);
+  const bottom = all.reduce((a,b)=>a.y>b.y?a:b);
+
+  const centerX = (minX + maxX) / 2;
+
+  return (
+    Math.abs(bottom.x - centerX) < w * 0.25 &&
+    bottom.y - top.y > h * 0.6
+  );
+}
+
+function detectPowerupShape(all) {
+  if (looksLikeV(all)) return "turtle";
+  if (looksLikeHeart(all)) return "heart";
+  if (looksLikeLightning(all)) return "shield";
+  return null;
+}
+
 function detectShape(all) {
   if (looksLikeLine(all)) return 'line';
   if (looksLikeTriangle(all)) return 'triangle';
@@ -644,6 +871,41 @@ function faceKilledEnemy(enemy) {
 }
 
 function castSpell() {
+    const drawn = detectPowerupShape(strokes.flat());
+
+  const powerup = powerups.find(
+    p => p.type === drawn
+  );
+
+  if (powerup) {
+
+    switch (powerup.type) {
+
+      case "heart":
+        playerHP = Math.min(100, playerHP + 20);
+        document.getElementById('hud').textContent =
+          'Collected Heart!';
+        break;
+
+      case "shield":
+        shieldActive = true;
+        document.getElementById('hud').textContent =
+          'Collected Shield!';
+        break;
+
+      case "turtle":
+        turtleActive = true;
+        turtleTimer = 600;
+        document.getElementById('hud').textContent =
+          'Collected Turtle!';
+        break;
+    }
+
+    powerups = powerups.filter(p => p !== powerup);
+
+    clearDrawing();
+    return;
+  }
   if (gameOver) return;
   if (strokes.length === 0) { document.getElementById('hud').textContent = 'Draw a shape first!'; return; }
 
