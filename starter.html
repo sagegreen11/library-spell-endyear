@@ -1,91 +1,92 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="UTF-8">
-<title>Library Game</title>
-<style>
-  body {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
-    margin: 0;
-    background: #1a1a2e  ;
-    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
-    gap: 16px;
-  }
-  canvas {
-    border: 1px solid #ffffff;
-    border-radius: 16px;
-    cursor: crosshair;
-    background: url('library.png') center/cover no-repeat;
-    touch-action: none;
-  }
-  .controls { display: flex; gap: 12px; }
-  button {
-    padding: 8px 28px;
-    font-size: 15px;
-    border: 1px solid #fff;
-    border-radius: 8px;
-    background: transparent;
-    color: #fff;
-    cursor: pointer;
-  }
-  button:hover { background: rgba(255,255,255,0.1); }
-  #hud { font-size: 20px; min-height: 24px; color: #fff; text-shadow: 0 0 4px rgba(0,0,0,0.5); }
-</style>
+  <meta charset="UTF-8">
+  <title>Library Game</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #1a1a2e  ;
+      font-family: "Courier New", Courier, monospace;
+      gap: 16px;
+    }
+    canvas {
+      border: 1px solid #ffffff;
+      border-radius: 16px;
+      cursor: crosshair;
+      background: url('library.png') center/cover no-repeat;
+      touch-action: none;
+    }
+    .controls { display: flex; gap: 12px; }
+    button {
+      padding: 8px 28px;
+      font-size: 15px;
+      border: 1px solid #fff;
+      border-radius: 8px;
+      background: transparent;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover { background: rgba(255,255,255,0.1); }
+    #hud { font-size: 20px; min-height: 24px; color: #fff; text-shadow: 0 0 4px rgba(0,0,0,0.5); }
+  </style>
 </head>
 <body>
 
-<canvas id="c" width="860" height="660"></canvas>
 
-<!-- <div class="controls" hidden>
-  <button onclick="castSpell()">Cast</button>
-  <button onclick="clearDrawing()">Clear</button>
-</div> -->
-<div id="hud" hidden>Draw the required shape to defeat each enemy!</div>
+<canvas id="c" width="860" height="660"></canvas>
+<div id="hud">Draw the required shape to defeat each enemy!</div>
+
 
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
 
-const W = 860, H = 660;
-const CX = W / 2, CY = H / 2;
 
-let drawing = false;
-let points = [];
-let strokes = [];
-let playerHP = 100;
-let gameOver = false;
-let enemies = [];
-let spawnTimer = 0;
-let spawnInterval = 300;
-let wave = 0;
-let level = 1;
-let showingLevel1 = true;
-let showingLevel2 = false;
-let levelScreenTimer = 0;
-let level2Started = false;
-let enemyKillCount = 0;
-let bossSpawned = false;
-const LEVEL_SCREEN_DURATION = 180;
-let gameTime = 0;
+  const W = 860, H = 660;
+  const CX = W / 2, CY = H / 2;
 
-let clearTimeoutId = null;
-let catFacingRight = true;
 
-let powerups = [];
+  let drawing = false;
+  let points = [];
+  let strokes = [];
+  let playerHP = 100;
+  let gameOver = false;
+  let enemies = [];
+  let spawnTimer = 0;
+  let spawnInterval = 300;
+  let wave = 0;
+  let level = 1;
+  let clearTimeoutId = null;
+  let showingLevel1 = true;
+  let showingLevel2 = false;
+  let levelScreenTimer = 0;
+  let level2Started = false;
+  let enemyKillCount = 0;
+  let bossSpawned = false;
+  let catFacingRight = true;
+  const LEVEL_SCREEN_DURATION = 180;
+  let gameTime = 0;
+  let showingLevel3 = false;
+  let level3Started = false;
+  let victory = false;
+  let powerups = [];
 
-let powerupSpawnTimer = 0;
-const POWERUP_SPAWN_INTERVAL = 420; // 7 sec @ 60fps
 
-let shieldActive = false;
-let turtleActive = false;
-let turtleTimer = 0;
+  let powerupSpawnTimer = 0;
+  const POWERUP_SPAWN_INTERVAL = 420; // 7 sec @ 60fps
 
-// Intro Screen State Manager
-let introState = 'title'; // Can be: 'title', 'instr1', 'instr2', 'done'
+
+  let shieldActive = false;
+  let turtleActive = false;
+  let turtleTimer = 0;
+
+let introState = 'title';
 
 const titleImg = new Image();
 titleImg.src = 'Lost Library.png';
@@ -97,896 +98,1366 @@ const instr2Img = new Image();
 instr2Img.src = 'Instructions2.png';
 
 
-const SHAPES = ['circle', 'square', 'line', 'triangle'];
-const SHAPE_COLORS = {
-  circle: '#4A90D9',
-  square: '#C0392B',
-  line: '#9B59B6',
-  triangle: '#E67E22'
-};
-const SHAPE_LABELS = {
-  square: 'SQUARE',
-  circle: 'CIRCLE',
-  line: 'LINE',
-  triangle: 'TRIANGLE'
-};
+  const bgMusic = new Audio("background.mp3");
+  bgMusic.loop = true;
+  bgMusic.volume = 0.4;
 
-function randomShape() {
-  return SHAPES[Math.floor(Math.random() * SHAPES.length)];
+
+  const spellcastSfx = new Audio("spellcast.mp3");
+  spellcastSfx.volume = 0.7;
+
+
+  const shieldSfx = new Audio("shield.mp3");
+  shieldSfx.volume = 0.8;
+
+
+  const turtleSfx = new Audio("turtle.mp3");
+  turtleSfx.volume = 0.8;
+
+
+  function playSound(sound) {
+    sound.currentTime = 0;
+    sound.play().catch(() => {});
+  }
+
+
+  let musicStarted = false;
+
+
+  function startMusic() {
+    if (musicStarted) return;
+
+
+    musicStarted = true;
+    bgMusic.play().catch(() => {});
+  }
+
+
+  canvas.addEventListener("mousedown", startMusic);
+  canvas.addEventListener("touchstart", startMusic);
+
+
+
+
+  const SHAPES = ['circle', 'square', 'line', 'triangle'];
+  const SHAPE_COLORS = {
+    circle: '#4A90D9',
+    square: '#C0392B',
+    line: '#9B59B6',
+    triangle: '#E67E22'
+  };
+  const SHAPE_LABELS = {
+    square: 'SQUARE',
+    circle: 'CIRCLE',
+    line: 'LINE',
+    triangle: 'TRIANGLE'
+  };
+
+
+  function randomShape() {
+    return SHAPES[Math.floor(Math.random() * SHAPES.length)];
+  }
+
+
+  function makeCombo(length = 2) {
+    const combo = [];
+    for (let i = 0; i < length; i++) combo.push(randomShape());
+    return combo;
+  }
+
+function drawFullscreenImage(img) {
+  const scale = Math.max(W / img.width, H / img.height);
+
+  const sw = W / scale;
+  const sh = H / scale;
+
+  const sx = (img.width - sw) / 2;
+  const sy = (img.height - sh) / 2;
+
+  ctx.drawImage(
+    img,
+    sx,
+    sy,
+    sw,
+    sh,
+    0,
+    0,
+    W,
+    H
+  );
 }
 
-function makeCombo(length = 2) {
-  const combo = [];
-  for (let i = 0; i < length; i++) combo.push(randomShape());
-  return combo;
-}
 
-function spawnEnemy() {
-  const angle = Math.random() * Math.PI * 2;
-  const r = 320;
-  const x = CX + Math.cos(angle) * r;
-  const y = CY + Math.sin(angle) * r;
-  const speed = 0.35 + Math.random() * 0.2 + wave * 0.05;
+  function spawnEnemy() {
+    const angle = Math.random() * Math.PI * 2;
+    const r = 320;
+    const x = CX + Math.cos(angle) * r;
+    const y = CY + Math.sin(angle) * r;
+    const speed = 0.35 + Math.random() * 0.2 + wave * 0.05;
 
-  const isCombo = wave > 2 && Math.random() < 0.3;
 
-  if (isCombo) {
-    const combo = makeCombo(Math.random() < 0.5 ? 2 : 3);
+    // ~30% chance of combo enemy after wave 2
+    const isCombo = wave > 2 && Math.random() < 0.3;
+
+
+    if (isCombo) {
+      const combo = makeCombo(Math.random() < 0.5 ? 2 : 3);
+      enemies.push({
+        x, y, speed, size: 38,
+        hit: 0, dead: false, deadTimer: 0,
+        isCombo: true, isBoss: false,
+        combo,
+        comboIndex: 0,
+        shape: combo[0]
+      });
+    } else {
+      const shape = randomShape();
+      enemies.push({
+        x, y, shape, speed, size: 34,
+        hit: 0, dead: false, deadTimer: 0,
+        isCombo: false, isBoss: false
+      });
+    }
+  }
+
+
+  function tryCastAndClear() {
+    if (strokes.length === 0) return;
+
+
+    castSpell();
+
+
+    if (clearTimeoutId) {
+      clearTimeout(clearTimeoutId);
+    }
+
+
+    clearTimeoutId = setTimeout(() => {
+      clearDrawing();
+    }, 2000);
+  }
+
+
+  function spawnBoss() {
+    bossSpawned = true;
+    const angle = Math.random() * Math.PI * 2;
+    const r = 340;
+    const x = CX + Math.cos(angle) * r;
+    const y = CY + Math.sin(angle) * r;
+
+
+    // Bosses move slower but require 4 keys
+    const speed = 0.25;
+    const combo = makeCombo(4);
+
+
     enemies.push({
-      x, y, speed, size: 38,
+      health: 3,
+      retreating: false,
+      retreatTimer: 0,
+      x, y, speed, size: 65,
       hit: 0, dead: false, deadTimer: 0,
-      isCombo: true, isBoss: false,
+      isCombo: true,
+      isBoss: true,
       combo,
       comboIndex: 0,
       shape: combo[0]
     });
-  } else {
-    const shape = randomShape();
-    enemies.push({
-      x, y, shape, speed, size: 34,
-      hit: 0, dead: false, deadTimer: 0,
-      isCombo: false, isBoss: false
+  }
+
+
+  function drawComboIndicator(e) {
+    if (!e.isCombo) return;
+    const iconSize = e.isBoss ? 16 : 13;
+    const gap = 5;
+    const total = e.combo.length * (iconSize + gap) - gap;
+    let sx = e.x - total / 2;
+  const ih = 80; // match what you have in drawEnemyShape
+  const sy = e.y - ih/2 - (e.isBoss ? 25 : 15); // push it above the single shape indicator
+
+
+    e.combo.forEach((shape, idx) => {
+      const cx = sx + iconSize / 2;
+      const cy = sy + iconSize / 2;
+      ctx.save();
+      ctx.globalAlpha = e.dead ? Math.max(0, e.deadTimer / 20) : 1;
+
+
+      if (idx < e.comboIndex) {
+        ctx.globalAlpha *= 0.2;
+      } else if (idx === e.comboIndex) {
+        ctx.shadowColor = '#fff';
+        ctx.shadowBlur = 8;
+      } else {
+        ctx.globalAlpha *= 0.55;
+      }
+
+
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = idx === e.comboIndex ? '#fff' : 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = 2;
+
+
+      if (shape === 'square') {
+        ctx.beginPath();
+        ctx.strokeRect(
+          cx - iconSize/2,
+          cy - iconSize/2,
+          iconSize,
+          iconSize
+        );
+        ctx.stroke();
+        // the circle and line icons
+      } else if (shape === 'circle') {
+        ctx.beginPath();
+        ctx.arc(cx, cy, iconSize/2, 0, Math.PI*2);
+        ctx.stroke();
+      } else if (shape === 'line') {
+        ctx.beginPath();
+        ctx.beginPath();
+        ctx.moveTo(cx - iconSize/2, cy);
+        ctx.lineTo(cx + iconSize/2, cy);
+        ctx.stroke();
+        ctx.stroke();
+      } else if (shape === 'triangle') {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - iconSize/2);
+        ctx.lineTo(cx + iconSize/2, cy + iconSize/2);
+        ctx.lineTo(cx - iconSize/2, cy + iconSize/2);
+        ctx.closePath();
+        ctx.stroke();
+      }
+
+
+      ctx.restore();
+      sx += iconSize + gap;
     });
   }
-}
 
-function spawnBoss() {
-  bossSpawned = true;
-  const angle = Math.random() * Math.PI * 2;
-  const r = 340;
-  const x = CX + Math.cos(angle) * r;
-  const y = CY + Math.sin(angle) * r;
-  
-  const speed = 0.25; 
-  const combo = makeCombo(4);
 
-  enemies.push({
-    x, y, speed, size: 65,
-    hit: 0, dead: false, deadTimer: 0,
-    isCombo: true,
-    isBoss: true,
-    combo,
-    comboIndex: 0,
-    shape: combo[0],
-    health: 3,
+  const ghostMad = new Image();
+  ghostMad.src = 'ghost-mad.png';
+
+
+  const ghostDead = new Image();
+  ghostDead.src = 'ghost-dead.png';
+
+
+
+
+  function spawnFinalBoss() {
+    bossSpawned = true;
+
+
+    const angle = Math.random() * Math.PI * 2;
+    const r = 340;
+
+
+    const x = CX + Math.cos(angle) * r;
+    const y = CY + Math.sin(angle) * r;
+
+
+    enemies.push({
+      health: 3,
     retreating: false,
-    retreatTimer: 0
-  });
-}
+    retreatTimer: 0,
+      x,
+      y,
 
-function drawComboIndicator(e) {
-  if (!e.isCombo) return;
-  
-  const iconSize = e.isBoss ? 26 : 18; 
-  const gap = 6;
-  const total = e.combo.length * (iconSize + gap) - gap;
-  let sx = e.x - total / 2;
-  
-  const ih = e.isBoss ? 120 : 70;
-  const sy = e.isBoss ? (e.y - ih / 2 - 25) : (e.y - ih / 2 - 15);
 
-  e.combo.forEach((shape, idx) => {
-    const cx = sx + iconSize / 2;
-    const cy = sy + iconSize / 2;
+      speed: 0.18,
+
+
+      size: 170, // about 5x bigger visually
+
+
+      hit: 0,
+      dead: false,
+      deadTimer: 0,
+
+
+      isCombo: true,
+      isBoss: true,
+      isFinalBoss: true,
+
+
+      combo: makeCombo(12), // huge combo
+      comboIndex: 0,
+
+
+      shape: null
+    });
+
+
+    enemies[enemies.length - 1].shape =
+      enemies[enemies.length - 1].combo[0];
+  }
+
+
+  function drawEnemyShape(e) {
+    const { x, y, size, shape, hit } = e;
+    const pulse = hit > 0 ? 1 + Math.sin(hit * 0.4) * 0.18 : 1;
+    const s = size * pulse;
     ctx.save();
     ctx.globalAlpha = e.dead ? Math.max(0, e.deadTimer / 20) : 1;
 
-    if (idx < e.comboIndex) {
-      ctx.globalAlpha *= 0.2;
-    } else if (idx === e.comboIndex) {
-      ctx.shadowColor = '#fff';
-      ctx.shadowBlur = 10;
-    } else {
-      ctx.globalAlpha *= 0.55;
-    }
 
-    ctx.fillStyle = SHAPE_COLORS[shape];
-    ctx.strokeStyle = idx === e.comboIndex ? '#fff' : 'rgba(255,255,255,0.5)';
-    ctx.lineWidth = e.isBoss ? 3 : 2;
-
-    if (shape === 'square') {
-      ctx.beginPath();
-      ctx.roundRect(cx - iconSize/2, cy - iconSize/2, iconSize, iconSize, e.isBoss ? 4 : 2);
-      ctx.fill(); ctx.stroke();
-    } else if (shape === 'circle') {
-      ctx.beginPath();
-      ctx.arc(cx, cy, iconSize/2, 0, Math.PI*2);
-      ctx.fill(); ctx.stroke();
-    } else if (shape === 'line') {
-      ctx.beginPath();
-      ctx.roundRect(cx - iconSize/2, cy - iconSize*0.28, iconSize, iconSize*0.56, 2);
-      ctx.fill(); ctx.stroke();
-    } else if (shape === 'triangle') {
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - iconSize/2);
-      ctx.lineTo(cx + iconSize/2, cy + iconSize/2);
-      ctx.lineTo(cx - iconSize/2, cy + iconSize/2);
-      ctx.closePath();
-      ctx.fill(); ctx.stroke();
-    }
-
-    ctx.restore();
-    sx += iconSize + gap;
-  });
-}
-
-const ghostMad = new Image();
-ghostMad.src = 'ghost-mad.png';
-
-const ghostDead = new Image();
-ghostDead.src = 'ghost-dead.png';
+    // Draw enemy image
+    const iw = e.isFinalBoss ? 120 : 60;
+    const ih = e.isFinalBoss ? 130 : 70;
+    const frame = e.dead ? ghostDead : ghostMad;
+    ctx.drawImage(frame, x - iw/2 , y - ih/2, iw, ih);
 
 
-function drawEnemyShape(e) {
-  const { x, y, size, shape, hit } = e;
-  const pulse = hit > 0 ? 1 + Math.sin(hit * 0.4) * 0.18 : 1;
-  const s = size * pulse;
-  ctx.save();
-  ctx.globalAlpha = e.dead ? Math.max(0, e.deadTimer / 20) : 1;
-
-  const iw = e.isBoss ? 100 : 60;
-  const ih = e.isBoss ? 120 : 70;
-  const frame = e.dead ? ghostDead : ghostMad;
-  ctx.drawImage(frame, x - iw/2 , y - ih/2, iw, ih);
 
 
-  if (!e.isCombo && !e.isBoss) {
+  if(!e.isCombo) {
+
+
+    // Draw shape indicator above the enemy's head
     ctx.translate(x, y);
     ctx.fillStyle = SHAPE_COLORS[shape];
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = 2;
 
-    const indicatorY = -ih/2 - 10;
-    const is = 22;
+
+  const indicatorY = -ih/2 - 10; // closer to the head, combo icons float above this
+    const is = 22; // indicator size
+
 
     if (shape === 'square') {
       ctx.beginPath();
-      ctx.roundRect(-is/2, indicatorY - is/2, is, is, 4);
-      ctx.fill(); ctx.stroke();
+      ctx.strokeRect(
+        -is/2,
+        indicatorY - is/2,
+        is,
+        is
+      );
+      ctx.stroke();
     } else if (shape === 'circle') {
       ctx.beginPath();
       ctx.arc(0, indicatorY, is/2, 0, Math.PI*2);
-      ctx.fill(); ctx.stroke();
+      ctx.stroke();
     } else if (shape === 'line') {
       ctx.beginPath();
-      ctx.roundRect(-is/2, indicatorY - is*0.28, is, is*0.56, 4);
-      ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-is/2, indicatorY);
+      ctx.lineTo(is/2, indicatorY);
+      ctx.stroke();
+      ctx.stroke();
     } else if (shape === 'triangle') {
       ctx.beginPath();
       ctx.moveTo(0, indicatorY - is/2);
       ctx.lineTo(is/2, indicatorY + is/2);
       ctx.lineTo(-is/2, indicatorY + is/2);
       ctx.closePath();
-      ctx.fill(); ctx.stroke();
+      ctx.stroke();
     }
+
+
+
+
+  }
+   drawComboIndicator(e);
+   ctx.restore();
+ }
+
+
+  const playerImg = new Image();
+  playerImg.src = 'cat.png';
+  const turtleImg = new Image();
+  turtleImg.src = "turtle.png";
+
+
+  const shieldImg = new Image();
+  shieldImg.src = "shield.png";
+
+
+  const heartImg = new Image();
+  heartImg.src = "heart.png";
+  // put your image file in the same folder
+
+
+  function drawPlayer() {
+    const w = 125, h = 170;
+
+
+    ctx.save();
+
+
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.beginPath();
+    ctx.ellipse(CX + 5, CY + 60, 30, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+
+    ctx.translate(CX, 0);
+
+
+    if (!catFacingRight) {
+      ctx.scale(-1, 1);
+    }
+
+
+    ctx.drawImage(playerImg, -w / 2, CY - h / 2, w, h);
+
+
+    ctx.restore();
   }
 
-  ctx.restore();
-  drawComboIndicator(e);
-}
 
-const playerImg = new Image();
-playerImg.src = 'cat.png';
-const turtleImg = new Image();
-turtleImg.src = "turtle.png";
-
-const shieldImg = new Image();
-shieldImg.src = "shield.png";
-
-const heartImg = new Image();
-heartImg.src = "heart.png";
+  function spawnPowerup() {
+    const types = ["heart", "shield", "turtle"];
 
 
-function drawPlayer() {
-  const w = 125, h = 170;
-  ctx.save();
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  ctx.beginPath();
-  ctx.ellipse(CX + 5, CY + 60, 30, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.translate(CX, 0);
+    const type =
+      types[Math.floor(Math.random() * types.length)];
 
-  if (!catFacingRight) {
-    ctx.scale(-1, 1);
+
+    let x, y;
+    const minDistance = 140; // distance from cat center
+
+
+    do {
+      x = 80 + Math.random() * (W - 160);
+      y = 80 + Math.random() * (H - 160);
+    } while (
+      Math.hypot(x - CX, y - CY) < minDistance
+    );
+
+
+    powerups.push({
+      type,
+      x,
+      y,
+      timer: 600,
+
+
+      // for bobbing
+      bobOffset: Math.random() * Math.PI * 2
+    });
   }
 
-  ctx.drawImage(playerImg, -w / 2, CY - h / 2, w, h);
-  ctx.restore();
-}
 
-function spawnPowerup() {
-  const types = ["heart", "shield", "turtle"];
-  const type = types[Math.floor(Math.random() * types.length)];
+  function drawPowerup(p) {
+    let size = 55;
 
-  let x, y;
-  const minDistance = 140;
 
-  do {
-    x = 80 + Math.random() * (W - 160);
-    y = 80 + Math.random() * (H - 160);
-  } while (
-    Math.hypot(x - CX, y - CY) < minDistance
-  );
+    let img;
 
-  powerups.push({
-    type,
-    x,
-    y,
-    timer: 600,
-    bobOffset: Math.random() * Math.PI * 2
-  });
-}
 
-function drawPowerup(p) {
-  let size = 55;
-  let img;
+    if (p.type === "turtle") {
+      size = 90;
+    }
 
-  if (p.type === "turtle") {
-    size = 90;
+
+    switch (p.type) {
+      case "heart": img = heartImg; break;
+      case "shield": img = shieldImg; break;
+      case "turtle": img = turtleImg; break;
+    }
+
+
+    const bobY =
+    Math.sin(gameTime * 0.08 + p.bobOffset) * 8;
+
+
+    ctx.drawImage(
+      img,
+      p.x - size / 2,
+      p.y - size / 2 + bobY,
+      size,
+      size
+    );
+
+
+    ctx.save();
+
+
+      const iconY = p.y - size / 2 - 18 + bobY;
+      const iconSize = 20;
+
+
+      ctx.fillStyle = "#FFD700";
+      ctx.strokeStyle = "#FFF";
+      ctx.lineWidth = 2;
+
+
+      switch (p.type) {
+
+
+        // V for turtle
+        case "turtle":
+          ctx.beginPath();
+          ctx.moveTo(p.x - iconSize/2, iconY - iconSize/2);
+          ctx.lineTo(p.x, iconY + iconSize/2);
+          ctx.lineTo(p.x + iconSize/2, iconY - iconSize/2);
+          ctx.stroke();
+          break;
+
+
+        // lightning for shield
+        case "shield":
+          ctx.beginPath();
+          ctx.moveTo(p.x - 5, iconY - 10);
+          ctx.lineTo(p.x + 4, iconY - 2);
+          ctx.lineTo(p.x - 2, iconY - 2);
+          ctx.lineTo(p.x + 6, iconY + 10);
+          ctx.stroke();
+          break;
+
+
+        // heart for heart
+        case "heart":
+          ctx.beginPath();
+          ctx.moveTo(p.x, iconY + 8);
+          ctx.bezierCurveTo(
+            p.x - 15, iconY - 8,
+            p.x - 20, iconY + 12,
+            p.x, iconY + 18
+          );
+          ctx.bezierCurveTo(
+            p.x + 20, iconY + 12,
+            p.x + 15, iconY - 8,
+            p.x, iconY + 8
+          );
+          ctx.stroke();
+          break;
+      }
+
+
+      ctx.restore();
+
+
   }
 
-  switch (p.type) {
-    case "heart": img = heartImg; break;
-    case "shield": img = shieldImg; break;
-    case "turtle": img = turtleImg; break;
-  }
-
-  const bobY = Math.sin(gameTime * 0.08 + p.bobOffset) * 8;
-
-  ctx.drawImage(
-    img,
-    p.x - size / 2,
-    p.y - size / 2 + bobY,
-    size,
-    size
-  );
-
-  ctx.save();
-  const iconY = p.y - size / 2 - 18 + bobY;
-  const iconSize = 20;
-
-  ctx.fillStyle = "#FFD700";
-  ctx.strokeStyle = "#FFF";
-  ctx.lineWidth = 2;
-
-  switch (p.type) {
-    case "turtle":
-      ctx.beginPath();
-      ctx.moveTo(p.x - iconSize/2, iconY - iconSize/2);
-      ctx.lineTo(p.x, iconY + iconSize/2);
-      ctx.lineTo(p.x + iconSize/2, iconY - iconSize/2);
-      ctx.stroke();
-      break;
-
-    case "shield":
-      ctx.beginPath();
-      ctx.moveTo(p.x - 5, iconY - 10);
-      ctx.lineTo(p.x + 4, iconY - 2);
-      ctx.lineTo(p.x - 2, iconY - 2);
-      ctx.lineTo(p.x + 6, iconY + 10);
-      ctx.stroke();
-      break;
-
-    case "heart":
-      ctx.beginPath();
-      ctx.moveTo(p.x, iconY + 8);
-      ctx.bezierCurveTo(
-        p.x - 15, iconY - 8,
-        p.x - 20, iconY + 12,
-        p.x, iconY + 18
-      );
-      ctx.bezierCurveTo(
-        p.x + 20, iconY + 12,
-        p.x + 15, iconY - 8,
-        p.x, iconY + 8
-      );
-      ctx.stroke();
-      break;
-  }
-  ctx.restore();
-}
 
 
-function drawPlayerHPBar() {
-  const bw = 200, bh = 16;
-  const bx = (W - bw) / 2, by = H - 36;
-  ctx.fillStyle = 'rgba(80,80,80,0.4)';
-  ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 6); ctx.fill();
-  const pct = playerHP / 100;
-  ctx.fillStyle = playerHP > 50 ? '#27AE60' : playerHP > 25 ? '#E67E22' : '#C0392B';
-  ctx.beginPath(); ctx.roundRect(bx, by, bw * pct, bh, 6); ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = '11px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`Player HP: ${playerHP}/100`, bx + bw/2, by + 8);
-}
 
-function drawHUD() {
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 15px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-
-  const targetGoal = level === 1 ? 5 : 10;
-
-  ctx.fillText(`Level: ${level}`, 12, 10);
-  if (bossSpawned) {
-    ctx.fillStyle = '#FF3366';
-    ctx.fillText(`Score: BOSS WAVE!`, 12, 30);
-  } else {
-    ctx.fillText(`Score: ${enemyKillCount}/${targetGoal}`, 12, 30);
-  }
-
-  const e = enemies.find(e => !e.dead);
-
-  if (e && !gameOver) {
+  function drawPlayerHPBar() {
+    const bw = 200, bh = 16;
+    const bx = (W - bw) / 2, by = H - 36;
+    ctx.fillStyle = 'rgba(80,80,80,0.4)';
+    ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, 6); ctx.fill();
+    const pct = playerHP / 100;
+    ctx.fillStyle = playerHP > 50 ? '#27AE60' : playerHP > 25 ? '#E67E22' : '#C0392B';
+    ctx.beginPath(); ctx.roundRect(bx, by, bw * pct, bh, 6); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
-    if (e.isBoss) {
-      const remaining = e.combo.slice(e.comboIndex);
-      const text = remaining.map(s => SHAPE_LABELS[s]).join(' ➔ ');
-      ctx.fillStyle = '#FF3366';
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillText("BOSS ENEMY — CAST: " + text, W / 2, 15);
-    } else if (e.isCombo) {
-      const remaining = e.combo.slice(e.comboIndex);
-      const text = remaining.map(s => SHAPE_LABELS[s]).join(' + ');
-      ctx.fillStyle = '#FFD700';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.fillText('COMBO ENEMY — Draw: ' + text, W / 2, 10);
-    } else {
-      ctx.fillStyle = SHAPE_COLORS[e.shape];
-      ctx.font = 'bold 16px sans-serif';
-      ctx.fillText('Draw a ' + SHAPE_LABELS[e.shape], W / 2, 10);
-    }
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`Player HP: ${playerHP}/100`, bx + bw/2, by + 8);
   }
 
-  if (gameOver) {
+
+  function drawHUD() {
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 20px "Courier New", monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+
+
+    const targetGoal = level === 1 ? 5 : 10;
+
+
+    ctx.fillText(`Level: ${level}`, 12, 10);
+    if (bossSpawned) {
+      ctx.fillStyle = '#FF3366';
+      ctx.fillText(`Score: BOSS WAVE!`, 12, 30);
+    } else {
+      ctx.fillText(`Score: ${enemyKillCount}/${targetGoal}`, 12, 30);
+    }
+
+
+    if (gameOver) {
+      ctx.fillStyle = 'rgba(0,0,0,0.75)';
+      ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 34px "Courier New", monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Game Over', W/2, H/2 - 20);
+      ctx.font = '18px "Courier New", monospace';
+      ctx.fillText('Refresh to play again', W/2, H/2 + 20);
+    }
+
+    const e = enemies.find(e => !e.dead);
+
+        if (e && e.isBoss) {
+
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#FF3366';
+
+          const remaining =
+            e.combo.slice(e.comboIndex);
+
+          const text =
+            remaining.map(s => SHAPE_LABELS[s]).join(' ➔ ');
+
+          ctx.fillText(
+            `BOSS (${e.health} HP) — ${text}`,
+            W / 2,
+            15
+          );
+        }
+  }
+
+
+  function drawVictoryScreen() {
+    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    ctx.fillRect(0, 0, W, H);
+
+
+    ctx.fillStyle = '#FFD700';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+
+    ctx.font = 'bold 52px "Courier New", monospace';
+    ctx.fillText('VICTORY!', W / 2, H / 2 - 40);
+
+
+    ctx.fillStyle = '#fff';
+    ctx.font = '22px "Courier New", monospace';
+    ctx.fillText(
+      'The Ancient Library Lord has been defeated!',
+      W / 2,
+      H / 2 + 20
+    );
+
+
+    ctx.font = '18px sans-serif';
+    ctx.fillText(
+      'Refresh to play again',
+      W / 2,
+      H / 2 + 60
+    );
+  }
+
+
+  function drawLevelScreen(title) {
     ctx.fillStyle = 'rgba(0,0,0,0.75)';
     ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = '#fff';
-    ctx.font = 'bold 34px sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Game Over', W/2, H/2 - 20);
-    ctx.font = '18px sans-serif';
-    ctx.fillText('Refresh to play again', W/2, H/2 + 20);
+    ctx.font = 'bold 42px "Courier New", monospace';
+    ctx.fillText(title, W / 2, H / 2 - 30);
+    ctx.font = '20px sans-serif';
   }
-}
 
-function drawLevelScreen(title, subtitle) {
-  ctx.fillStyle = 'rgba(0,0,0,0.75)';
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#fff';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.font = 'bold 42px sans-serif';
-  ctx.fillText(title, W / 2, H / 2 - 30);
-  ctx.font = '20px sans-serif';
-  ctx.fillText(subtitle, W / 2, H / 2 + 15);
-}
 
-function drawUserStrokes() {
-  const all = strokes.flat().concat(points);
-  let color = '#4A90D9';
-  if (all.length >= 8) {
-    if (looksLikeSquare(all) || looksLikeCircle(all) || looksLikeLine(all) || looksLikeTriangle(all)) color = '#3BBA4C';
-  }
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3.5;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  strokes.forEach(s => {
-    ctx.beginPath();
-    s.forEach((p, i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
-    ctx.stroke();
-  });
-  if (points.length > 1) {
-    ctx.beginPath();
-    points.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
-    ctx.stroke();
-  }
-}
-
-// Helper to project widescreen backgrounds cleanly
-function drawFullscreenImage(img) {
-  const scale = Math.max(W / img.width, H / img.height);
-  const sw = W / scale;
-  const sh = H / scale;
-  const sx = (img.width - sw) / 2;
-  const sy = (img.height - sh) / 2;
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, W, H);
-}
-
-function loop() {
-  ctx.clearRect(0, 0, W, H);
-
-  // Intro Scenes Flow Sequence
-  if (introState !== 'done') {
-    if (introState === 'title') {
-      drawFullscreenImage(titleImg);
-    } else if (introState === 'instr1') {
-      drawFullscreenImage(instr1Img);
-    } else if (introState === 'instr2') {
-      drawFullscreenImage(instr2Img);
+  function drawUserStrokes() {
+    const all = strokes.flat().concat(points);
+    let color = '#4A90D9';
+    if (all.length >= 8) {
+      if (looksLikeSquare(all) || looksLikeCircle(all) || looksLikeLine(all) || looksLikeTriangle(all)) color = '#3BBA4C';
     }
-    requestAnimationFrame(loop);
-    return;
-  }
-
-  if (showingLevel1) {
-    drawLevelScreen('Level 1', 'Defeat 4 Minions + The Guardian Boss');
-    levelScreenTimer++;
-    if (levelScreenTimer >= LEVEL_SCREEN_DURATION) showingLevel1 = false;
-    requestAnimationFrame(loop);
-    return;
-  }
-
-  if (showingLevel2) {
-    drawLevelScreen('Level 2', 'Defeat 9 Fast Minions + Final Overlord Boss');
-    levelScreenTimer++;
-    if (levelScreenTimer >= LEVEL_SCREEN_DURATION) showingLevel2 = false;
-    requestAnimationFrame(loop);
-    return;
-  }
-
-  if (!gameOver) {
-    const goal = level === 1 ? 5 : 10;
-
-    if (enemyKillCount === (goal - 1) && !bossSpawned && enemies.length === 0) {
-      spawnBoss();
-    }
-
-    if (!bossSpawned) {
-      spawnTimer++;
-      if (spawnTimer >= spawnInterval) {
-        spawnTimer = 0;
-        wave++;
-        spawnEnemy();
-        if (spawnInterval > 140) spawnInterval -= 6;
-      }
-    }
-
-    if (enemyKillCount >= 5 && !level2Started) {
-      level = 2;
-      enemyKillCount = 0;
-      bossSpawned = false;
-      level2Started = true;
-      showingLevel2 = true;
-      levelScreenTimer = 0;
-      enemies = [];
-    } else if (enemyKillCount >= 10 && level2Started) {
-      ctx.clearRect(0, 0, W, H);
-      drawLevelScreen('VICTORY!', 'You cleared all levels successfully!');
-      return;
-    }
-
-    enemies.forEach(e => {
-      if (e.dead) { e.deadTimer--; return; }
-      const dx = CX - e.x, dy = CY - e.y;
-      const dist = Math.hypot(dx, dy);
-
-      if (dist < 26) {
-        if (e.isBoss) {
-          if (shieldActive) {
-            shieldActive = false;
-            document.getElementById('hud').textContent = 'Shield blocked damage!';
-          } else {
-            playerHP = Math.max(0, playerHP - 40);
-            if (playerHP <= 0) { playerHP = 0; gameOver = true; }
-            document.getElementById('hud').textContent = 'The Boss struck you!';
-          }
-          e.retreating = true;
-          e.retreatTimer = 120;
-        } else {
-          if (shieldActive) {
-            shieldActive = false;
-            document.getElementById('hud').textContent = 'Shield blocked damage!';
-          } else {
-            playerHP = Math.max(0, playerHP - 20);
-            if (playerHP <= 0) { playerHP = 0; gameOver = true; }
-            document.getElementById('hud').textContent = 'Enemy reached you!';
-          }
-          e.dead = true;
-          e.deadTimer = 20;
-        }
-        return;
-      }
-
-      if (e.isBoss && e.retreating) {
-        e.retreatTimer--;
-        e.x -= (dx / dist) * e.speed * 3;
-        e.y -= (dy / dist) * e.speed * 3;
-        if (e.retreatTimer <= 0) e.retreating = false;
-        return;
-      }
-
-      const speedMult = turtleActive ? 0.5 : 1;
-      e.x += (dx / dist) * e.speed * speedMult;
-      e.y += (dy / dist) * e.speed * speedMult;
-      if (e.hit > 0) e.hit--;
-
-      if (e.isBoss) {
-        e.scrambleTimer = (e.scrambleTimer || 0) + 1;
-        if (e.scrambleTimer > 100) {
-          e.scrambleTimer = 0;
-          const remaining = e.combo.slice(e.comboIndex);
-          for (let i = remaining.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
-          }
-          e.combo = [...e.combo.slice(0, e.comboIndex), ...remaining];
-          e.shape = e.combo[e.comboIndex];
-          document.getElementById('hud').textContent = 'The boss scrambled its combo!';
-        }
-      }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3.5;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    strokes.forEach(s => {
+      ctx.beginPath();
+      s.forEach((p, i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+      ctx.stroke();
     });
-
-    enemies = enemies.filter(e => !e.dead || e.deadTimer > 0);
-  }
-
-  gameTime++;
-
-  powerups.forEach(drawPowerup);
-  enemies.forEach(drawEnemyShape);
-  drawPlayer();
-  drawPlayerHPBar();
-  drawUserStrokes();
-  drawHUD();
-
-  powerupSpawnTimer++;
-
-  if (powerupSpawnTimer >= POWERUP_SPAWN_INTERVAL) {
-    powerupSpawnTimer = 0;
-    spawnPowerup();
-  }
-
-  powerups.forEach(p => p.timer--);
-  powerups = powerups.filter(p => p.timer > 0);
-
-  if (turtleActive) {
-    turtleTimer--;
-    if (turtleTimer <= 0) {
-      turtleActive = false;
+    if (points.length > 1) {
+      ctx.beginPath();
+      points.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+      ctx.stroke();
     }
+  }
+
+
+  function loop() {
+    if (introState !== 'done') {
+
+  if (introState === 'title') {
+    drawFullscreenImage(titleImg);
+  }
+
+  else if (introState === 'instr1') {
+    drawFullscreenImage(instr1Img);
+  }
+
+  else if (introState === 'instr2') {
+    drawFullscreenImage(instr2Img);
   }
 
   requestAnimationFrame(loop);
+  return;
 }
-
-function getPos(e) {
-  const r = canvas.getBoundingClientRect();
-  const scaleX = W / r.width;
-  const scaleY = H / r.height;
-  if (e.touches) return { x: (e.touches[0].clientX - r.left)*scaleX, y: (e.touches[0].clientY - r.top)*scaleY };
-  return { x: (e.clientX - r.left)*scaleX, y: (e.clientY - r.top)*scaleY };
-}
-
-canvas.addEventListener('mousedown', e => {
-  if (introState !== 'done') return; // Prevent raw drawing actions on text slides
-  drawing = true;
-  const pos = getPos(e);
-  updateCatFacing(pos);
-  points = [pos];
-});
-
-canvas.addEventListener('mousemove', e => {
-  if (!drawing || introState !== 'done') return;
-  const pos = getPos(e);
-  updateCatFacing(pos);
-  points.push(pos);
-});
-
-canvas.addEventListener('mouseup', () => {
-  if (introState !== 'done') return;
-  if (points.length > 1) {
-    strokes.push([...points]);
-  }
-  drawing = false;
-  points = [];
-  tryCastAndClear();
-});
-
-canvas.addEventListener('touchstart', e => {
-  e.preventDefault();
-  if (introState !== 'done') return;
-  const pos = getPos(e);
-  updateCatFacing(pos);
-  drawing = true;
-  points = [pos];
-});
-
-canvas.addEventListener('touchmove', e => {
-  e.preventDefault();
-  if (!drawing || introState !== 'done') return;
-  const pos = getPos(e);
-  updateCatFacing(pos);
-  points.push(pos);
-});
-
-canvas.addEventListener('touchend', e => {
-  e.preventDefault();
-  if (introState !== 'done') return;
-  if (points.length > 1) {
-    strokes.push([...points]);
-  }
-  drawing = false;
-  points = [];
-  tryCastAndClear();
-});
-
-// Single point click handler controlling scene state routing
-canvas.addEventListener('click', () => {
-  if (introState === 'title') {
-    introState = 'instr1';
-  } else if (introState === 'instr1') {
-    introState = 'instr2';
-  } else if (introState === 'instr2') {
-    introState = 'done';
-    // Activate HUD layers only after instructions are cleared
-    document.getElementById('hud').removeAttribute('hidden');
-  }
-});
+    ctx.clearRect(0, 0, W, H);
 
 
-function looksLikeSquare(all) {
-  if (all.length < 10) return false;
-  const xs = all.map(p => p.x), ys = all.map(p => p.y);
-  const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
-  const ratio = Math.min(w, h) / Math.max(w, h);
-  if (w < 20 || h < 20 || ratio < 0.5) return false;
-  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
-  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
-  const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
-  const avgD = dists.reduce((a, b) => a + b, 0) / dists.length;
-  const variance = dists.reduce((a, b) => a + Math.abs(b - avgD), 0) / dists.length;
-  if (variance / avgD < 0.05) return false; 
-  return true; 
-}
 
-function looksLikeCircle(all) {
-  if (all.length < 10) return false;
-  const xs = all.map(p => p.x);
-  const ys = all.map(p => p.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const w = maxX - minX;
-  const h = maxY - minY;
-  const ratio = Math.min(w, h) / Math.max(w, h);
-  if (ratio < 0.45) return false;
-  const cx = (minX + maxX) / 2;
-  const cy = (minY + maxY) / 2;
-  const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
-  const avgD = dists.reduce((a,b)=>a+b,0) / dists.length;
-  const variance = dists.reduce((a,b)=>a+Math.abs(b-avgD),0) / dists.length;
-  return variance / avgD < 0.35;
-}
 
-function looksLikeLine(all) {
-  if (all.length < 6) return false;
-  const xs=all.map(p=>p.x), ys=all.map(p=>p.y);
-  const w=Math.max(...xs)-Math.min(...xs);
-  const h=Math.max(...ys)-Math.min(...ys);
-  if (w < 60) return false;
-  return h/w < 0.35;
-}
 
-function looksLikeTriangle(all) {
-  if (all.length < 10) return false;
-  const xs = all.map(p => p.x), ys = all.map(p => p.y);
-  const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
-  if (w < 20 || h < 20) return false;
-  const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
-  const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
-  const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
-  const avgD = dists.reduce((a, b) => a + b, 0) / dists.length;
-  const variance = dists.reduce((a, b) => a + Math.abs(b - avgD), 0) / dists.length;
-  return (variance / avgD > 0.15); 
-}
 
-function looksLikeV(all) {
-  if (all.length < 8) return false;
-  const first = all[0];
-  const mid = all[Math.floor(all.length / 2)];
-  const last = all[all.length - 1];
-  return (
-    mid.y > first.y &&
-    mid.y > last.y &&
-    Math.abs(first.x - last.x) > 40
-  );
-}
-
-function looksLikeLightning(all) {
-  if (all.length < 6) return false;
-  const xs = all.map(p => p.x);
-  const ys = all.map(p => p.y);
-  const w = Math.max(...xs) - Math.min(...xs);
-  const h = Math.max(...ys) - Math.min(...ys);
-  if (w < 20 || h < 20) return false;
-  let turns = 0;
-  for (let i = 2; i < all.length; i++) {
-    const dx1 = all[i - 1].x - all[i - 2].x;
-    const dx2 = all[i].x - all[i - 1].x;
-    if (dx1 * dx2 < 0) turns++;
-  }
-  return turns >= 1;
-}
-
-function looksLikeHeart(all) {
-  if (all.length < 8) return false;
-  const xs = all.map(p => p.x);
-  const ys = all.map(p => p.y);
-  const minX = Math.min(...xs);
-  const maxX = Math.max(...xs);
-  const minY = Math.min(...ys);
-  const maxY = Math.max(...ys);
-  const w = maxX - minX;
-  const h = maxY - minY;
-  if (w < 25 || h < 25) return false;
-  const top = all.reduce((a,b)=>a.y<b.y?a:b);
-  const bottom = all.reduce((a,b)=>a.y>b.y?a:b);
-  const centerX = (minX + maxX) / 2;
-  return (
-    Math.abs(bottom.x - centerX) < w * 0.25 &&
-    bottom.y - top.y > h * 0.6
-  );
-}
-
-function detectPowerupShape(all) {
-  if (looksLikeV(all)) return "turtle";
-  if (looksLikeHeart(all)) return "heart";
-  if (looksLikeLightning(all)) return "shield";
-  return null;
-}
-
-function detectShape(all) {
-  if (looksLikeLine(all)) return 'line';
-  if (looksLikeTriangle(all)) return 'triangle';
-  if (looksLikeSquare(all)) return 'square';
-  if (looksLikeCircle(all)) return 'circle';
-  return null;
-}
-
-function faceKilledEnemy(enemy) {
-  catFacingRight = enemy.x > CX;
-}
-
-function tryCastAndClear() {
-  castSpell();
-}
-
-function castSpell() {
-  const drawn = detectPowerupShape(strokes.flat());
-  const powerup = powerups.find(p => p.type === drawn);
-
-  if (powerup) {
-    switch (powerup.type) {
-      case "heart":
-        playerHP = Math.min(100, playerHP + 20);
-        document.getElementById('hud').textContent = 'Collected Heart!';
-        break;
-      case "shield":
-        shieldActive = true;
-        document.getElementById('hud').textContent = 'Collected Shield!';
-        break;
-      case "turtle":
-        turtleActive = true;
-        turtleTimer = 600;
-        document.getElementById('hud').textContent = 'Collected Turtle!';
-        break;
+    if (showingLevel1) {
+      drawLevelScreen('Level 1');
+      levelScreenTimer++;
+      if (levelScreenTimer >= LEVEL_SCREEN_DURATION) showingLevel1 = false;
+      requestAnimationFrame(loop);
+      return;
     }
-    powerups = powerups.filter(p => p !== powerup);
-    clearDrawing();
-    return;
-  }
 
-  if (gameOver) return;
-  if (strokes.length === 0) { return; }
 
-  const target = enemies.find(e => !e.dead);
-  if (!target) { clearDrawing(); return; }
+    if (showingLevel2) {
+      drawLevelScreen('Level 2');
+      levelScreenTimer++;
+      if (levelScreenTimer >= LEVEL_SCREEN_DURATION) showingLevel2 = false;
+      requestAnimationFrame(loop);
+      return;
+    }
 
-  if (!target.isCombo) {
-    const all = strokes.flat();
-    const detected = detectShape(all);
-    if (detected === target.shape) {
-      clearDrawing();
-      if (clearTimeoutId) {
-        clearTimeout(clearTimeoutId);
+
+    if (victory) {
+      drawVictoryScreen();
+      requestAnimationFrame(loop);
+      return;
+    }
+
+
+    if (!gameOver) {
+      const goal =
+      level === 1 ? 5 :
+      level === 2 ? 10 :
+      1;
+
+
+      if (
+        level === 3 &&
+        !bossSpawned &&
+        enemies.length === 0
+      ) {
+        spawnFinalBoss();
       }
-      faceKilledEnemy(target);
-      target.dead = true;
-      target.deadTimer = 20;
-      document.getElementById('hud').textContent = 'Enemy defeated!';
-      enemyKillCount++;
-    } else {
-      document.getElementById('hud').textContent = `Wrong shape! Draw a ${SHAPE_LABELS[target.shape]}`;
-    }
-  } else {
-    const combo = target.combo;
-    let strokesUsed = 0;
 
-    for (let i = target.comboIndex; i < combo.length; i++) {
-      if (strokesUsed >= strokes.length) break;
 
-      const detected = detectShape(strokes[strokesUsed]);
-      if (detected === combo[i]) {
-        target.comboIndex++;
-        strokesUsed++;
-        if (target.comboIndex < combo.length) {
-          target.shape = combo[target.comboIndex];
+      // Check if it's time to spawn a boss instead of normal minions
+      if (enemyKillCount === (goal - 1) && !bossSpawned && enemies.length === 0) {
+        spawnBoss();
+      }
+
+
+      // Minion continuous spawning only happens if the boss isn't out yet
+      if (!bossSpawned) {
+        spawnTimer++;
+        if (spawnTimer >= spawnInterval) {
+          spawnTimer = 0;
+          wave++;
+          spawnEnemy();
+          if (spawnInterval > 140) spawnInterval -= 6;
         }
-      } else {
-        document.getElementById('hud').textContent = `Incorrect combo shape! Needed ${SHAPE_LABELS[combo[i]]}`;
-        clearDrawing();
+      }
+
+
+      if (showingLevel3) {
+        drawLevelScreen(
+          'Level 3'
+        );
+
+
+        levelScreenTimer++;
+
+
+        if (levelScreenTimer >= LEVEL_SCREEN_DURATION) {
+          showingLevel3 = false;
+        }
+
+
+        requestAnimationFrame(loop);
         return;
       }
+
+
+      // Handle Level transitions after Boss is executed
+      if (enemyKillCount >= 5 && !level2Started) {
+        level = 2;
+        enemyKillCount = 0;
+        bossSpawned = false;
+        level2Started = true;
+        showingLevel2 = true;
+        levelScreenTimer = 0;
+        enemies = [];
+      } else if (
+        enemyKillCount >= 10 &&
+        level2Started &&
+        !level3Started
+      ) {
+        level = 3;
+
+
+        enemyKillCount = 0;
+
+
+        bossSpawned = false;
+
+
+        level3Started = true;
+
+
+        showingLevel3 = true;
+        levelScreenTimer = 0;
+
+
+        enemies = [];
+      }
+
+
+      enemies.forEach(e => {
+        if (e.dead) { e.deadTimer--; return; }
+        const dx = CX - e.x, dy = CY - e.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 26) {
+          if (e.isBoss && e.retreating) {
+
+          e.retreatTimer--;
+
+          e.x -= (dx / dist) * e.speed * 3;
+          e.y -= (dy / dist) * e.speed * 3;
+
+          if (e.retreatTimer <= 0) {
+            e.retreating = false;
+          }
+
+          return;
+        }
+        if (shieldActive) {
+
+
+          shieldActive = false;
+
+
+          document.getElementById('hud').textContent =
+            'Shield blocked damage!';
+
+
+        } else {
+
+
+          playerHP = Math.max(
+            0,
+            playerHP - (e.isBoss ? 40 : 20)
+          );
+
+
+        }
+          e.dead = true;
+          e.deadTimer = 20;
+          if (playerHP <= 0) { playerHP = 0; gameOver = true; }
+          document.getElementById('hud').textContent = e.isBoss ? 'The Boss struck you!' : `Enemy reached you!`;
+          return;
+        }
+        const speedMult = turtleActive ? 0.5 : 1;
+        e.x += (dx / dist) * e.speed * speedMult;
+        e.y += (dy / dist) * e.speed * speedMult;
+        if (e.hit > 0) e.hit--;
+
+
+        if (e.isBoss) {
+          e.scrambleTimer = (e.scrambleTimer || 0) + 1;
+          if (e.scrambleTimer > 100) {
+            e.scrambleTimer = 0;
+            const remaining = e.combo.slice(e.comboIndex);
+            for (let i = remaining.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+            }
+            e.combo = [...e.combo.slice(0, e.comboIndex), ...remaining];
+            e.shape = e.combo[e.comboIndex];
+            document.getElementById('hud').textContent = 'The boss scrambled its combo!';
+          }
+        }
+      });
+
+
+      enemies = enemies.filter(e => !e.dead || e.deadTimer > 0);
     }
 
-    if (target.comboIndex >= combo.length) {
-      clearDrawing();
-      if (clearTimeoutId) {
-        clearTimeout(clearTimeoutId);
-      }
-      faceKilledEnemy(target);
 
-      if (target.isBoss) {
-        target.health--;
-        if (target.health <= 0) {
-          target.dead = true;
-          target.deadTimer = 20;
-          enemyKillCount++;
-          document.getElementById('hud').textContent = 'BOSS DESTROYED!';
-        } else {
-          target.retreating = true;
-          target.retreatTimer = 120;
-          target.combo = makeCombo(4);
-          target.comboIndex = 0;
-          target.shape = target.combo[0];
-          document.getElementById('hud').textContent = `Boss retreats! ${target.health} lives remaining!`;
+    gameTime++;
+    powerups.forEach(drawPowerup);
+    enemies.forEach(drawEnemyShape);
+    drawPlayer();
+    drawPlayerHPBar();
+    drawUserStrokes();
+    drawHUD();
+
+
+    powerupSpawnTimer++;
+
+
+    if (powerupSpawnTimer >= POWERUP_SPAWN_INTERVAL) {
+      powerupSpawnTimer = 0;
+      spawnPowerup();
+    }
+
+
+    powerups.forEach(p => p.timer--);
+
+
+    powerups = powerups.filter(p => p.timer > 0);
+
+
+      if (turtleActive) {
+      turtleTimer--;
+
+
+      if (turtleTimer <= 0) {
+        turtleActive = false;
+      }
+    }
+
+
+    requestAnimationFrame(loop);
+  }
+
+
+  function getPos(e) {
+    const r = canvas.getBoundingClientRect();
+    const scaleX = W / r.width;
+    const scaleY = H / r.height;
+    if (e.touches) return { x: (e.touches[0].clientX - r.left)*scaleX, y: (e.touches[0].clientY - r.top)*scaleY };
+    return { x: (e.clientX - r.left)*scaleX, y: (e.clientY - r.top)*scaleY };
+  }
+
+
+  canvas.addEventListener('mousedown', e => {
+    if (introState !== 'done') return;
+    drawing = true;
+    const pos = getPos(e);
+    updateCatFacing(pos);
+    points = [pos];
+  });
+
+  canvas.addEventListener('mousemove', e => {
+  if (introState !== 'done') return;
+    if (!drawing) return;
+
+
+    const pos = getPos(e);
+    updateCatFacing(pos);
+    points.push(pos);
+  });
+
+      canvas.addEventListener('click', () => {
+
+      if (introState === 'title') {
+        introState = 'instr1';
+      }
+
+      else if (introState === 'instr1') {
+        introState = 'instr2';
+      }
+
+      else if (introState === 'instr2') {
+        introState = 'done';
+      }
+
+    });
+
+
+  canvas.addEventListener('mouseup', () => {
+  if (introState !== 'done') return;
+    if (points.length > 1) {
+      strokes.push([...points]);
+    }
+
+
+
+    drawing = false;
+    points = [];
+
+
+    tryCastAndClear();
+  });
+
+
+  canvas.addEventListener('touchstart', e => {
+  if (introState !== 'done') return;
+    e.preventDefault();
+
+
+    const pos = getPos(e);
+    updateCatFacing(pos);
+
+
+    drawing = true;
+    points = [pos];
+  });
+
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (!drawing) return;
+
+
+    const pos = getPos(e);
+    updateCatFacing(pos);
+
+
+    points.push(pos);
+  });
+
+
+  canvas.addEventListener('touchend', e => {
+  if (introState !== 'done') return;
+    e.preventDefault();
+
+
+    if (points.length > 1) {
+      strokes.push([...points]);
+    }
+
+
+    drawing = false;
+    points = [];
+
+
+    tryCastAndClear();
+  });
+
+
+
+
+  function looksLikeSquare(all) {
+    if (all.length < 10) return false;
+    const xs = all.map(p => p.x), ys = all.map(p => p.y);
+    const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+    const ratio = Math.min(w, h) / Math.max(w, h);
+    if (w < 20 || h < 20 || ratio < 0.5) return false;
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
+    const avgD = dists.reduce((a, b) => a + b, 0) / dists.length;
+    const variance = dists.reduce((a, b) => a + Math.abs(b - avgD), 0) / dists.length;
+    if (variance / avgD < 0.05) return false;
+    return true;
+  }
+
+
+  function looksLikeCircle(all) {
+    if (all.length < 10) return false;
+
+
+    const xs = all.map(p => p.x);
+    const ys = all.map(p => p.y);
+
+
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+
+    const w = maxX - minX;
+    const h = maxY - minY;
+
+
+    const ratio = Math.min(w, h) / Math.max(w, h);
+
+
+    if (ratio < 0.3) return false;
+
+
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+
+
+    const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
+
+
+    const avgD = dists.reduce((a,b)=>a+b,0) / dists.length;
+
+
+    const variance =
+      dists.reduce((a,b)=>a+Math.abs(b-avgD),0) / dists.length;
+
+
+    return variance / avgD < 0.5;
+  }
+
+
+  function looksLikeLine(all) {
+    if (all.length < 6) return false;
+    const xs=all.map(p=>p.x), ys=all.map(p=>p.y);
+    const w=Math.max(...xs)-Math.min(...xs);
+    const h=Math.max(...ys)-Math.min(...ys);
+    if (w < 60) return false;
+    return h/w < 0.35;
+  }
+
+
+  function looksLikeTriangle(all) {
+    if (all.length < 10) return false;
+    const xs = all.map(p => p.x), ys = all.map(p => p.y);
+    const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+    if (w < 20 || h < 20) return false;
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+    const dists = all.map(p => Math.hypot(p.x - cx, p.y - cy));
+    const avgD = dists.reduce((a, b) => a + b, 0) / dists.length;
+    const variance = dists.reduce((a, b) => a + Math.abs(b - avgD), 0) / dists.length;
+    return (variance / avgD > 0.15);
+  }
+
+
+  function looksLikeV(all) {
+    if (all.length < 8) return false;
+
+
+    const first = all[0];
+    const mid = all[Math.floor(all.length / 2)];
+    const last = all[all.length - 1];
+
+
+    return (
+      mid.y > first.y &&
+      mid.y > last.y &&
+      Math.abs(first.x - last.x) > 40
+    );
+  }
+
+
+  function looksLikeLightning(all) {
+    if (all.length < 6) return false;
+
+
+    const xs = all.map(p => p.x);
+    const ys = all.map(p => p.y);
+
+
+    const w = Math.max(...xs) - Math.min(...xs);
+    const h = Math.max(...ys) - Math.min(...ys);
+
+
+    if (w < 20 || h < 20) return false;
+
+
+    let turns = 0;
+
+
+    for (let i = 2; i < all.length; i++) {
+      const dx1 = all[i - 1].x - all[i - 2].x;
+      const dx2 = all[i].x - all[i - 1].x;
+
+
+      if (dx1 * dx2 < 0) turns++;
+    }
+
+
+    return turns >= 1;
+  }
+
+
+  function looksLikeHeart(all) {
+    if (all.length < 8) return false;
+
+
+    const xs = all.map(p => p.x);
+    const ys = all.map(p => p.y);
+
+
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+
+
+    const w = maxX - minX;
+    const h = maxY - minY;
+
+
+    if (w < 25 || h < 25) return false;
+
+
+    const top = all.reduce((a,b)=>a.y<b.y?a:b);
+    const bottom = all.reduce((a,b)=>a.y>b.y?a:b);
+
+
+    const centerX = (minX + maxX) / 2;
+
+
+    return (
+      Math.abs(bottom.x - centerX) < w * 0.25 &&
+      bottom.y - top.y > h * 0.6
+    );
+  }
+
+
+  function detectPowerupShape(all) {
+    if (looksLikeV(all)) return "turtle";
+    if (looksLikeHeart(all)) return "heart";
+    if (looksLikeLightning(all)) return "shield";
+    return null;
+  }
+
+
+  function detectShape(all) {
+    if (looksLikeLine(all)) return 'line';
+    if (looksLikeTriangle(all)) return 'triangle';
+    if (looksLikeSquare(all)) return 'square';
+    if (looksLikeCircle(all)) return 'circle';
+    return null;
+  }
+
+
+  function faceKilledEnemy(enemy) {
+    catFacingRight = enemy.x > CX;
+  }
+
+
+  function castSpell() {
+        playSound(spellcastSfx);
+      const drawn = detectPowerupShape(strokes.flat());
+
+
+    const powerup = powerups.find(
+      p => p.type === drawn
+    );
+
+
+    if (powerup) {
+
+
+      switch (powerup.type) {
+
+
+        case "heart":
+          playSound(shieldSfx);
+          playerHP = Math.min(100, playerHP + 20);
+          document.getElementById('hud').textContent =
+            'Collected Heart!';
+          break;
+
+
+        case "shield":
+          playSound(shieldSfx);
+          shieldActive = true;
+          document.getElementById('hud').textContent =
+            'Collected Shield!';
+          break;
+
+
+        case "turtle":
+          playSound(turtleSfx);
+          turtleActive = true;
+          turtleTimer = 600;
+          document.getElementById('hud').textContent =
+            'Collected Turtle!';
+          break;
+      }
+
+
+      powerups = powerups.filter(p => p !== powerup);
+
+
+      clearDrawing();
+      return;
+    }
+    if (gameOver) return;
+    if (strokes.length === 0) { document.getElementById('hud').textContent = 'Draw a shape first!'; return; }
+
+
+    const target = enemies.find(e => !e.dead);
+    if (!target) { document.getElementById('hud').textContent = 'No enemies!'; clearDrawing(); return; }
+
+
+    if (!target.isCombo) {
+      const all = strokes.flat();
+      const detected = detectShape(all);
+      if (detected === target.shape) {
+        clearDrawing();
+
+
+        if (clearTimeoutId) {
+          clearTimeout(clearTimeoutId);
         }
-      } else {
+
+
+        faceKilledEnemy(target);
         target.dead = true;
         target.deadTimer = 20;
+        document.getElementById('hud').textContent = 'Enemy defeated!';
         enemyKillCount++;
-        document.getElementById('hud').textContent = 'COMBO DEFEATED!';
+      } else {
+        document.getElementById('hud').textContent = `Wrong shape! Draw a ${SHAPE_LABELS[target.shape]}`;
+      }
+    } else {
+      // Combo & Boss evaluation logic
+      const combo = target.combo;
+      let strokesUsed = 0;
+
+
+      for (let i = target.comboIndex; i < combo.length; i++) {
+        if (strokesUsed >= strokes.length) break;
+
+
+        const detected = detectShape(strokes[strokesUsed]);
+        if (detected === combo[i]) {
+          target.comboIndex++;
+          strokesUsed++;
+          if (target.comboIndex < combo.length) {
+            target.shape = combo[target.comboIndex]; // Advance targeted icon shape visual
+          }
+        } else {
+          document.getElementById('hud').textContent = `Incorrect combo shape! Needed ${SHAPE_LABELS[combo[i]]}`;
+          clearDrawing();
+          return;
+        }
+      }
+
+
+      if (target.comboIndex >= combo.length) {
+          clearDrawing();
+
+
+          if (clearTimeoutId) {
+            clearTimeout(clearTimeoutId);
+          }
+
+
+          faceKilledEnemy(target);
+          target.dead = true;
+          target.deadTimer = 20;
+
+
+          // FINAL BOSS DEFEATED -> WIN GAME
+          if (target.isFinalBoss) {
+            victory = true;
+            document.getElementById('hud').textContent = 'VICTORY!';
+          } else {
+            enemyKillCount++;
+            document.getElementById('hud').textContent =
+              target.isBoss ? 'BOSS DESTROYED!' : 'COMBO DEFEATED!';
+          }
+        } else {
+        document.getElementById('hud').textContent = `Good hit! Keep going, ${combo.length - target.comboIndex} shapes remaining!`;
       }
     }
+
+
+    clearDrawing();
   }
-  clearDrawing();
-}
 
-function clearDrawing() {
-  strokes = []; points = [];
-}
 
-function updateCatFacing(pos) {
-  catFacingRight = pos.x > CX;
-}
+  function clearDrawing() {
+    strokes = []; points = [];
+  }
 
-loop();
+
+  function updateCatFacing(pos) {
+    catFacingRight = pos.x > CX;
+  }
+
+
+    loop();
 </script>
 </body>
 </html>
+
